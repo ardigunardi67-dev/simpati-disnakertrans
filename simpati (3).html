@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMPATI — Disnakertrans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --navy-900:#0F3550;
+    --navy-800:#144365;
+    --navy-700:#1E6091;
+    --navy-050:#EAF1F6;
+    --paper:#F6F4EE;
+    --surface:#FFFFFF;
+    --ink:#1B1E20;
+    --ink-soft:#5B6368;
+    --line:#DCD6C8;
+    --line-strong:#B9B2A0;
+    --good:#2D7D52;
+    --good-bg:#E6F2EA;
+    --warn:#B4711F;
+    --warn-bg:#FBEFDE;
+    --bad:#AC4438;
+    --bad-bg:#F8E7E4;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.serif{ font-family:'Source Serif 4', serif; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:
+      linear-gradient(180deg, var(--navy-900) 0%, var(--navy-800) 100%);
+    padding:24px;
+  }
+  .login-card{
+    width:100%;
+    max-width:400px;
+    background:var(--surface);
+    border-top:4px solid var(--navy-700);
+    padding:40px 36px 32px;
+    box-shadow:0 24px 60px rgba(6,20,32,0.35);
+  }
+  .login-mark{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:4px;
+  }
+  .login-mark .mark-letter{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:30px;
+    color:var(--navy-900);
+    letter-spacing:0.5px;
+  }
+  .login-sub{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.5;
+    margin:0 0 28px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--line);
+  }
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    font-size:14px;
+    font-family:'Inter',sans-serif;
+    background:var(--surface);
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--navy-700);
+    outline-offset:1px;
+    border-color:var(--navy-700);
+  }
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border:none;
+    border-radius:var(--radius);
+    padding:10px 18px;
+    font-size:13.5px;
+    font-weight:600;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    transition:background .12s ease;
+  }
+  .btn-primary{ background:var(--navy-800); color:#fff; }
+  .btn-primary:hover{ background:var(--navy-900); }
+  .btn-block{ width:100%; }
+  .btn-ghost{ background:transparent; color:var(--navy-800); border:1px solid var(--line-strong); }
+  .btn-ghost:hover{ background:var(--navy-050); }
+  .btn-danger{ background:var(--bad); color:#fff; }
+  .btn-danger:hover{ background:#8f362c; }
+  .btn-sm{ padding:6px 12px; font-size:12.5px; }
+  .login-hint{
+    margin-top:18px;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    background:var(--navy-050);
+    border:1px solid var(--line);
+    padding:10px 12px;
+    border-radius:var(--radius);
+    line-height:1.6;
+  }
+  .login-error{
+    background:var(--bad-bg);
+    color:var(--bad);
+    border:1px solid #e3bab3;
+    padding:9px 12px;
+    border-radius:var(--radius);
+    font-size:12.5px;
+    margin-bottom:16px;
+  }
+
+  /* ---------- APP SHELL ---------- */
+  #app-shell{ display:none; min-height:100vh; }
+  #app-shell.active{ display:flex; }
+  .sidebar{
+    width:230px;
+    flex-shrink:0;
+    background:var(--navy-900);
+    color:#DCE8EF;
+    display:flex;
+    flex-direction:column;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .sidebar-brand{
+    padding:22px 20px 18px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+  }
+  .sidebar-brand .mark-letter{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:22px;
+    color:#fff;
+    letter-spacing:0.4px;
+  }
+  .sidebar-brand .mark-sub{
+    font-size:10.5px;
+    color:#93ADBE;
+    line-height:1.5;
+    margin-top:6px;
+  }
+  .nav-group{ padding:14px 10px; flex:1; overflow-y:auto; }
+  .nav-label{
+    font-size:10px;
+    font-weight:600;
+    color:#6E90A5;
+    padding:8px 10px 4px;
+    letter-spacing:0.4px;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 12px;
+    border-radius:var(--radius);
+    font-size:13.5px;
+    font-weight:500;
+    color:#C7D9E3;
+    cursor:pointer;
+    margin-bottom:2px;
+    border-left:3px solid transparent;
+  }
+  .nav-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
+  .nav-item.active{
+    background:rgba(255,255,255,0.1);
+    color:#fff;
+    border-left-color:#6FB3D9;
+  }
+  .nav-item .dot{
+    width:7px; height:7px; border-radius:50%; flex-shrink:0;
+    background:currentColor; opacity:0.55;
+  }
+  .sidebar-foot{
+    padding:14px 16px 18px;
+    border-top:1px solid rgba(255,255,255,0.12);
+  }
+  .sidebar-user{
+    font-size:12.5px;
+    color:#DCE8EF;
+    margin-bottom:10px;
+  }
+  .sidebar-user .role{ display:block; font-size:11px; color:#8FAABC; }
+
+  .main{ flex:1; min-width:0; }
+  .topbar{
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
+    padding:16px 32px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .topbar h1{ font-size:19px; margin:0; color:var(--navy-900); }
+  .topbar p{ margin:2px 0 0; font-size:12.5px; color:var(--ink-soft); }
+  .content{ padding:26px 32px 60px; max-width:1180px; }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    margin-bottom:22px;
+  }
+  .panel-head{
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .panel-head h2{ font-size:15.5px; margin:0; color:var(--navy-900); }
+  .panel-head .desc{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .panel-body{ padding:20px; }
+
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  @media (max-width:720px){ .grid-2, .grid-3{ grid-template-columns:1fr; } }
+
+  .checklist-row{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:9px 0; border-bottom:1px dashed var(--line);
+    font-size:13.5px;
+  }
+  .checklist-row:last-child{ border-bottom:none; }
+  .checklist-row input{ margin-top:3px; }
+
+  .alert{
+    padding:11px 14px;
+    border-radius:var(--radius);
+    font-size:13px;
+    margin-bottom:16px;
+    line-height:1.55;
+    border:1px solid transparent;
+  }
+  .alert-bad{ background:var(--bad-bg); color:var(--bad); border-color:#e3bab3; }
+  .alert-good{ background:var(--good-bg); color:var(--good); border-color:#b9dcc4; }
+  .alert-warn{ background:var(--warn-bg); color:var(--warn); border-color:#e9cd9f; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  thead th{
+    text-align:left;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    color:var(--ink-soft);
+    padding:8px 10px;
+    border-bottom:1px solid var(--line-strong);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:10px 10px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  tbody tr:hover{ background:var(--navy-050); }
+  .empty-row td{ color:var(--ink-soft); font-style:italic; text-align:center; padding:26px 10px; }
+
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    font-weight:600;
+    padding:3px 9px;
+    border-radius:12px;
+    white-space:nowrap;
+  }
+  .badge-good{ background:var(--good-bg); color:var(--good); }
+  .badge-warn{ background:var(--warn-bg); color:var(--warn); }
+  .badge-bad{ background:var(--bad-bg); color:var(--bad); }
+  .badge-neutral{ background:var(--navy-050); color:var(--navy-800); }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:22px; }
+  @media (max-width:900px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+  .stat-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:4px solid var(--navy-700);
+    padding:14px 16px;
+  }
+  .stat-card .num{ font-family:'Source Serif 4',serif; font-size:26px; font-weight:600; color:var(--navy-900); }
+  .stat-card .lbl{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .stat-card.c-good{ border-left-color:var(--good); }
+  .stat-card.c-warn{ border-left-color:var(--warn); }
+  .stat-card.c-bad{ border-left-color:var(--bad); }
+
+  .form-actions{ display:flex; gap:10px; margin-top:6px; }
+  .hint-text{ font-size:11.5px; color:var(--ink-soft); margin-top:4px; }
+  .flow-steps{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .flow-step{
+    font-size:11px; color:var(--navy-800); background:var(--navy-050);
+    border:1px solid var(--line); padding:5px 10px; border-radius:20px;
+  }
+  .flow-step b{ font-weight:700; margin-right:4px; }
+
+  ::placeholder{ color:#A7A296; }
+
+  @media print{
+    .sidebar, .topbar .btn, #print-hide{ display:none !important; }
+    body{ background:#fff; }
+    .content{ padding:0; max-width:100%; }
+    .panel{ border:none; box-shadow:none; }
+  }
+
+  /* ---------- LABEL CETAK ASET (10cm x 4cm) ---------- */
+  .logo-preview-box{
+    width:76px; height:76px; border:1px solid var(--line-strong);
+    display:flex; align-items:center; justify-content:center;
+    background:#fff; flex-shrink:0; overflow:hidden;
+  }
+  .logo-preview-box img{ max-width:100%; max-height:100%; object-fit:contain; }
+  .logo-placeholder-sm{ font-size:8px; font-weight:700; color:var(--ink-soft); text-align:center; line-height:1.3; padding:4px; }
+
+  #print-label-area{ display:none; }
+  .label{
+    width:10cm; height:4cm; display:flex;
+    font-family:'Inter',sans-serif; color:#0A0A0A; background:#fff;
+  }
+  .label-col{ box-sizing:border-box; padding:0.2cm; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
+  .label-logo{ width:3cm; border-right:1px solid #000; }
+  .label-logo img{ max-width:100%; max-height:100%; object-fit:contain; }
+  .label-logo .logo-placeholder{ font-size:8px; font-weight:700; line-height:1.3; color:#333; border:1px dashed #777; padding:5px; }
+  .label-kode{ width:4cm; border-right:1px solid #000; }
+  .label-instansi{ font-size:7px; font-weight:700; letter-spacing:0.2px; margin-bottom:5px; color:#222; }
+  .label-kode-text{ font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:700; line-height:1.15; word-break:break-all; }
+  .label-nama-text{ font-size:7.5px; margin-top:4px; line-height:1.3; max-height:0.9cm; overflow:hidden; }
+  .label-qr{ width:3cm; }
+  .label-qr .qr-box{ width:2.5cm; height:2.5cm; }
+  .label-qr .qr-box img, .label-qr .qr-box canvas{ width:100% !important; height:100% !important; }
+  .label-qr .qr-caption{ font-size:6px; color:#333; margin-top:3px; }
+
+  @page{ size: 10cm 4cm; margin:0; }
+  @media print{
+    body.printing-label > *:not(#print-label-area){ display:none !important; }
+    body.printing-label #print-label-area{ display:block !important; margin:0; }
+    body.printing-label{ margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-mark">
+      <span class="mark-letter">SIMPATI</span>
+    </div>
+    <p class="login-sub">Sistem Informasi Verifikasi, Peminjaman, Pemeliharaan, Pencatatan Barang Milik Daerah dan Identifikasi<br>Dinas Tenaga Kerja dan Transmigrasi</p>
+    <div id="login-error-slot"></div>
+    <form onsubmit="return handleLogin(event)">
+      <div class="field">
+        <label for="li-username">Nama pengguna</label>
+        <input id="li-username" type="text" autocomplete="username" placeholder="mis. admin">
+      </div>
+      <div class="field">
+        <label for="li-password">Kata sandi</label>
+        <input id="li-password" type="password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Masuk</button>
+    </form>
+    <div class="login-hint">
+      <b>Versi prototipe.</b> Gunakan admin / admin123 untuk masuk. Data aset tersimpan bersama untuk seluruh pengguna sistem ini dan akan terus ada di percobaan berikutnya. Autentikasi resmi dapat dikembangkan pada tahap revisi berikutnya.
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark-letter">SIMPATI</div>
+      <div class="mark-sub">Verifikasi · Peminjaman · Pemeliharaan · Identifikasi · Pencatatan BMD</div>
+    </div>
+    <div class="nav-group" id="nav-group"></div>
+    <div class="sidebar-foot">
+      <div class="sidebar-user">
+        <span id="sidebar-username">—</span>
+        <span class="role">Operator BMD</span>
+      </div>
+      <button class="btn btn-ghost btn-block btn-sm" style="color:#DCE8EF;border-color:rgba(255,255,255,0.25);" onclick="handleLogout()">Keluar</button>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="topbar-title">Beranda</h1>
+        <p id="topbar-desc">Ringkasan pengelolaan barang milik daerah</p>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div id="print-label-area"></div>
+
+<script>
+/* =========================================================
+   SIMPATI — prototype single-file app
+   Data disimpan melalui window.storage (shared = true)
+   sehingga terlihat oleh semua pengguna sistem ini.
+   ========================================================= */
+
+const DEMO_USER = { username: 'admin', password: 'admin123' };
+
+const state = {
+  loggedIn: false,
+  username: '',
+  view: 'beranda',
+  loaded: false,
+  data: { assets: [], verifikasi: [], peminjaman: [], pemeliharaan: [], identifikasi: [] },
+  settings: { logoDataUrl: null },
+  formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null },
+  formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null }
+};
+
+const NAV_ITEMS = [
+  { key:'beranda', label:'Beranda' },
+  { key:'verifikasi', label:'Verifikasi' },
+  { key:'peminjaman', label:'Peminjaman' },
+  { key:'pemeliharaan', label:'Pemeliharaan' },
+  { key:'identifikasi', label:'Identifikasi' },
+  { key:'pencatatan', label:'Pencatatan Aset' },
+  { key:'laporan', label:'Laporan' }
+];
+
+function uid(prefix){ return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '—'; try{ const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});}catch(e){ return d; } }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- STORAGE ---------------- */
+async function loadCollection(key){
+  try{
+    const res = await window.storage.get(key, true);
+    if(res && res.value){ return JSON.parse(res.value); }
+    return null;
+  }catch(e){ return null; }
+}
+async function saveCollection(key){
+  try{
+    await window.storage.set(key, JSON.stringify(state.data[key]), true);
+  }catch(e){ console.error('Gagal menyimpan '+key, e); }
+}
+
+function seedData(){
+  state.data.assets = [
+    { id: uid('AST'), kode:'BMD-001', nama:'Laptop Dell Latitude 5420', kategori:'Elektronik', tahun:'2023', nilai:'12500000', lokasi:'Bidang Penempatan Tenaga Kerja', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
+    { id: uid('AST'), kode:'BMD-002', nama:'Kendaraan Dinas Avanza B 1234 XX', kategori:'Kendaraan', tahun:'2021', nilai:'220000000', lokasi:'Garasi Kantor', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
+    { id: uid('AST'), kode:'BMD-003', nama:'Meja Kerja Kayu Jati', kategori:'Furnitur', tahun:'2019', nilai:'1500000', lokasi:'Bidang Transmigrasi', kondisi:'Rusak Ringan', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
+    { id: uid('AST'), kode:'BMD-004', nama:'Proyektor Epson EB-X05', kategori:'Elektronik', tahun:'2022', nilai:'5200000', lokasi:'Ruang Rapat Utama', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() }
+  ];
+  state.data.verifikasi = [];
+  state.data.peminjaman = [];
+  state.data.pemeliharaan = [];
+  state.data.identifikasi = [];
+}
+
+async function initData(){
+  const keys = ['assets','verifikasi','peminjaman','pemeliharaan','identifikasi'];
+  const results = await Promise.all(keys.map(loadCollection));
+  let anyFound = false;
+  keys.forEach((k,i)=>{ if(results[i]){ state.data[k] = results[i]; anyFound = true; } });
+  if(!anyFound){
+    seedData();
+    await Promise.all(keys.map(saveCollection));
+  }
+  state.settings = await loadSettings();
+  state.loaded = true;
+}
+
+async function loadSettings(){
+  try{
+    const res = await window.storage.get('settings', true);
+    if(res && res.value) return JSON.parse(res.value);
+  }catch(e){ /* belum ada pengaturan tersimpan */ }
+  return { logoDataUrl: null };
+}
+async function saveSettings(){
+  try{ await window.storage.set('settings', JSON.stringify(state.settings), true); }
+  catch(e){ console.error('Gagal menyimpan pengaturan', e); }
+}
+
+/* ---------------- AUTH ---------------- */
+function handleLogin(ev){
+  ev.preventDefault();
+  const u = document.getElementById('li-username').value.trim();
+  const p = document.getElementById('li-password').value;
+  if(u === DEMO_USER.username && p === DEMO_USER.password){
+    state.loggedIn = true;
+    state.username = u;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').classList.add('active');
+    document.getElementById('sidebar-username').textContent = u;
+    renderApp();
+  } else {
+    document.getElementById('login-error-slot').innerHTML =
+      '<div class="login-error">Nama pengguna atau kata sandi salah. Gunakan admin / admin123.</div>';
+  }
+  return false;
+}
+function handleLogout(){
+  state.loggedIn = false;
+  document.getElementById('app-shell').classList.remove('active');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('li-password').value = '';
+  document.getElementById('login-error-slot').innerHTML = '';
+}
+
+/* ---------------- NAV / SHELL ---------------- */
+function goTo(view){
+  state.view = view;
+  Object.keys(state.formError).forEach(k=>state.formError[k]=null);
+  Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
+  renderApp();
+  window.scrollTo(0,0);
+}
+
+function renderNav(){
+  const html = NAV_ITEMS.map(item => `
+    <div class="nav-item ${state.view===item.key?'active':''}" onclick="goTo('${item.key}')">
+      <span class="dot"></span>${item.label}
+    </div>
+  `).join('');
+  document.getElementById('nav-group').innerHTML = html;
+}
+
+const TITLES = {
+  beranda:['Beranda','Ringkasan pengelolaan barang milik daerah'],
+  verifikasi:['Verifikasi Aset','Periksa kelengkapan dokumen dan status aset'],
+  peminjaman:['Peminjaman Aset','Catat permintaan pinjam dan cek ketersediaan aset'],
+  pemeliharaan:['Pemeliharaan Aset','Jadwalkan perawatan dan catat riwayat perbaikan'],
+  identifikasi:['Identifikasi Aset','Tetapkan kode, lokasi, dan kondisi terkini aset'],
+  pencatatan:['Pencatatan Aset','Daftarkan aset baru ke dalam basis data BMD'],
+  laporan:['Laporan BMD','Rekap inventaris, peminjaman, pemeliharaan, dan identifikasi']
+};
+
+/* ---------------- HELPERS: assets ---------------- */
+function getAsset(id){ return state.data.assets.find(a=>a.id===id); }
+function assetOptions(selectedId){
+  return state.data.assets.map(a =>
+    `<option value="${a.id}" ${a.id===selectedId?'selected':''}>${escapeHtml(a.kode)} — ${escapeHtml(a.nama)}</option>`
+  ).join('');
+}
+function statusBadge(status){
+  const map = {
+    'Tersedia':'badge-good', 'Dipinjam':'badge-warn', 'Pemeliharaan':'badge-bad',
+    'Belum Diverifikasi':'badge-neutral', 'Terverifikasi':'badge-good',
+    'Baik':'badge-good', 'Rusak Ringan':'badge-warn', 'Rusak Berat':'badge-bad',
+    'Berjalan':'badge-warn', 'Selesai':'badge-good'
+  };
+  return `<span class="badge ${map[status]||'badge-neutral'}">${escapeHtml(status)}</span>`;
+}
+
+/* ================= RENDER: BERANDA ================= */
+function renderBeranda(){
+  const a = state.data.assets;
+  const total = a.length;
+  const tersedia = a.filter(x=>x.statusKetersediaan==='Tersedia').length;
+  const dipinjam = a.filter(x=>x.statusKetersediaan==='Dipinjam').length;
+  const pemeliharaan = a.filter(x=>x.statusKetersediaan==='Pemeliharaan').length;
+  const rusak = a.filter(x=>x.kondisi==='Rusak Ringan'||x.kondisi==='Rusak Berat').length;
+
+  const recent = []
+    .concat(state.data.verifikasi.map(x=>({t:x.tanggal, kind:'Verifikasi', text:`Verifikasi ${assetLabel(x.assetId)} — ${x.valid?'valid':'tidak valid'}`})))
+    .concat(state.data.peminjaman.map(x=>({t:x.tglPinjam, kind:'Peminjaman', text:`${escapeHtml(x.peminjam)} meminjam ${assetLabel(x.assetId)}`})))
+    .concat(state.data.pemeliharaan.map(x=>({t:x.tanggal, kind:'Pemeliharaan', text:`${x.jenis} pada ${assetLabel(x.assetId)}`})))
+    .concat(state.data.identifikasi.map(x=>({t:x.tanggal, kind:'Identifikasi', text:`Identifikasi ${assetLabel(x.assetId)} di ${escapeHtml(x.lokasi)}`})))
+    .sort((p,q)=> (q.t||'').localeCompare(p.t||''))
+    .slice(0,8);
+
+  return `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset tercatat</div></div>
+      <div class="stat-card c-good"><div class="num">${tersedia}</div><div class="lbl">Tersedia</div></div>
+      <div class="stat-card c-warn"><div class="num">${dipinjam}</div><div class="lbl">Sedang dipinjam</div></div>
+      <div class="stat-card c-bad"><div class="num">${pemeliharaan}</div><div class="lbl">Dalam pemeliharaan</div></div>
+      <div class="stat-card c-warn"><div class="num">${rusak}</div><div class="lbl">Kondisi rusak</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>Aktivitas terbaru</h2><div class="desc">8 catatan terakhir dari seluruh modul</div></div>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Modul</th><th>Keterangan</th></tr></thead>
+          <tbody>
+            ${recent.length ? recent.map(r=>`<tr><td>${fmtDate(r.t)}</td><td>${r.kind}</td><td>${r.text}</td></tr>`).join('') :
+              '<tr class="empty-row"><td colspan="3">Belum ada aktivitas. Mulai dengan mencatat aset pada menu Pencatatan Aset.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function assetLabel(id){ const a=getAsset(id); return a ? `${escapeHtml(a.kode)} (${escapeHtml(a.nama)})` : '—'; }
+
+/* ================= RENDER: VERIFIKASI ================= */
+function renderVerifikasi(){
+  const err = state.formError.verifikasi;
+  const ok = state.formSuccess.verifikasi;
+  return `
+    <div class="flow-steps">
+      <span class="flow-step"><b>1</b>Input data aset &amp; dokumen</span>
+      <span class="flow-step"><b>2</b>Cek kelengkapan &amp; status aset</span>
+      <span class="flow-step"><b>3</b>Valid? Simpan &amp; perbarui status</span>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Formulir verifikasi</h2><div class="desc">Pilih aset dan periksa kelengkapan dokumennya</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
+        <form onsubmit="return handleVerifikasiSubmit(event)">
+          <div class="field">
+            <label for="vf-asset">Aset</label>
+            <select id="vf-asset">${assetOptions()}</select>
+          </div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;">Kelengkapan dokumen</label>
+          <div class="checklist-row"><input type="checkbox" id="vf-doc1"><label for="vf-doc1">Bukti kepemilikan / berita acara serah terima</label></div>
+          <div class="checklist-row"><input type="checkbox" id="vf-doc2"><label for="vf-doc2">Kartu inventaris barang (KIB)</label></div>
+          <div class="checklist-row"><input type="checkbox" id="vf-doc3"><label for="vf-doc3">Foto kondisi aset terkini</label></div>
+          <div class="field" style="margin-top:14px;">
+            <label for="vf-note">Catatan (opsional)</label>
+            <textarea id="vf-note" rows="2" placeholder="Catatan pemeriksaan..."></textarea>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan verifikasi</button></div>
+        </form>`}
+      </div>
+    </div>
+    ${renderVerifikasiTable()}
+  `;
+}
+function renderVerifikasiTable(){
+  const rows = [...state.data.verifikasi].sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Riwayat verifikasi</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Aset</th><th>Dokumen lengkap</th><th>Hasil</th><th>Catatan</th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>`
+              <tr>
+                <td>${fmtDate(r.tanggal)}</td>
+                <td>${assetLabel(r.assetId)}</td>
+                <td>${r.checklist.kepemilikan?'✔':'—'} ${r.checklist.kartuInventaris?'✔':'—'} ${r.checklist.fotoKondisi?'✔':'—'}</td>
+                <td>${r.valid? statusBadge('Terverifikasi') : statusBadge('Belum Diverifikasi')}</td>
+                <td>${escapeHtml(r.catatan||'—')}</td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="5">Belum ada riwayat verifikasi.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function handleVerifikasiSubmit(ev){
+  ev.preventDefault();
+  const assetId = document.getElementById('vf-asset').value;
+  const kepemilikan = document.getElementById('vf-doc1').checked;
+  const kartuInventaris = document.getElementById('vf-doc2').checked;
+  const fotoKondisi = document.getElementById('vf-doc3').checked;
+  const catatan = document.getElementById('vf-note').value.trim();
+  const valid = kepemilikan && kartuInventaris && fotoKondisi;
+
+  const record = { id: uid('VER'), assetId, checklist:{kepemilikan,kartuInventaris,fotoKondisi}, valid, catatan, tanggal: todayISO() };
+  state.data.verifikasi.push(record);
+
+  if(valid){
+    const asset = getAsset(assetId);
+    if(asset) asset.statusVerifikasi = 'Terverifikasi';
+    state.formError.verifikasi = null;
+    state.formSuccess.verifikasi = 'Data valid. Verifikasi tersimpan dan status aset diperbarui menjadi Terverifikasi.';
+  } else {
+    const missing = [];
+    if(!kepemilikan) missing.push('bukti kepemilikan');
+    if(!kartuInventaris) missing.push('kartu inventaris');
+    if(!fotoKondisi) missing.push('foto kondisi');
+    state.formSuccess.verifikasi = null;
+    state.formError.verifikasi = `Data tidak lengkap. Dokumen berikut belum tersedia: ${missing.join(', ')}. Verifikasi dicatat sebagai belum valid.`;
+  }
+  await saveCollection('verifikasi');
+  await saveCollection('assets');
+  renderApp();
+  return false;
+}
+
+/* ================= RENDER: PEMINJAMAN ================= */
+function renderPeminjaman(){
+  const err = state.formError.peminjaman;
+  const ok = state.formSuccess.peminjaman;
+  return `
+    <div class="flow-steps">
+      <span class="flow-step"><b>1</b>Input data peminjam &amp; aset</span>
+      <span class="flow-step"><b>2</b>Cek ketersediaan aset</span>
+      <span class="flow-step"><b>3</b>Tersedia? Buat surat &amp; perbarui status</span>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Formulir peminjaman</h2><div class="desc">Aset hanya dapat dipinjam jika berstatus Tersedia</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
+        <form onsubmit="return handlePeminjamanSubmit(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label for="pj-asset">Aset</label>
+              <select id="pj-asset">${assetOptions()}</select>
+            </div>
+            <div class="field">
+              <label for="pj-nama">Nama peminjam</label>
+              <input id="pj-nama" type="text" placeholder="Nama lengkap">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pj-unit">Unit / bidang</label>
+              <input id="pj-unit" type="text" placeholder="mis. Bidang Pelatihan Kerja">
+            </div>
+            <div class="field">
+              <label for="pj-tgl-kembali">Rencana tanggal kembali</label>
+              <input id="pj-tgl-kembali" type="date">
+            </div>
+          </div>
+          <div class="field">
+            <label for="pj-keperluan">Keperluan</label>
+            <textarea id="pj-keperluan" rows="2" placeholder="Keperluan peminjaman..."></textarea>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Ajukan peminjaman</button></div>
+        </form>`}
+      </div>
+    </div>
+    ${renderPeminjamanTable()}
+  `;
+}
+function renderPeminjamanTable(){
+  const rows = [...state.data.peminjaman].sort((a,b)=>b.tglPinjam.localeCompare(a.tglPinjam));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Riwayat peminjaman</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>No. Surat</th><th>Aset</th><th>Peminjam</th><th>Unit</th><th>Pinjam</th><th>Rencana kembali</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>`
+              <tr>
+                <td class="mono">${r.nomorSurat}</td>
+                <td>${assetLabel(r.assetId)}</td>
+                <td>${escapeHtml(r.peminjam)}</td>
+                <td>${escapeHtml(r.unit||'—')}</td>
+                <td>${fmtDate(r.tglPinjam)}</td>
+                <td>${fmtDate(r.rencanaKembali)}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td>${r.status==='Dipinjam' ? `<button class="btn btn-ghost btn-sm" onclick="handleKembalikan('${r.id}')">Kembalikan</button>` : ''}</td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="8">Belum ada riwayat peminjaman.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function handlePeminjamanSubmit(ev){
+  ev.preventDefault();
+  const assetId = document.getElementById('pj-asset').value;
+  const peminjam = document.getElementById('pj-nama').value.trim();
+  const unit = document.getElementById('pj-unit').value.trim();
+  const rencanaKembali = document.getElementById('pj-tgl-kembali').value;
+  const keperluan = document.getElementById('pj-keperluan').value.trim();
+  const asset = getAsset(assetId);
+
+  if(!peminjam){
+    state.formError.peminjaman = 'Nama peminjam wajib diisi.';
+    renderApp(); return false;
+  }
+  if(!asset || asset.statusKetersediaan !== 'Tersedia'){
+    state.formSuccess.peminjaman = null;
+    state.formError.peminjaman = `Aset tidak tersedia. Status aset saat ini: ${asset? statusBadge(asset.statusKetersediaan) : 'tidak ditemukan'}.`;
+    renderApp(); return false;
+  }
+  const record = {
+    id: uid('PJM'), assetId, peminjam, unit, keperluan,
+    tglPinjam: todayISO(), rencanaKembali, tglKembaliAktual:null,
+    status:'Dipinjam', nomorSurat: 'SP/' + Date.now().toString().slice(-6) + '/BMD'
+  };
+  state.data.peminjaman.push(record);
+  asset.statusKetersediaan = 'Dipinjam';
+  state.formError.peminjaman = null;
+  state.formSuccess.peminjaman = `Aset tersedia. Surat peminjaman ${record.nomorSurat} dibuat dan status aset diperbarui menjadi Dipinjam.`;
+  await saveCollection('peminjaman');
+  await saveCollection('assets');
+  renderApp();
+  return false;
+}
+async function handleKembalikan(id){
+  const r = state.data.peminjaman.find(x=>x.id===id);
+  if(!r) return;
+  r.status = 'Selesai';
+  r.tglKembaliAktual = todayISO();
+  const asset = getAsset(r.assetId);
+  if(asset) asset.statusKetersediaan = 'Tersedia';
+  await saveCollection('peminjaman');
+  await saveCollection('assets');
+  renderApp();
+}
+
+/* ================= RENDER: PEMELIHARAAN ================= */
+function renderPemeliharaan(){
+  const err = state.formError.pemeliharaan;
+  const ok = state.formSuccess.pemeliharaan;
+  return `
+    <div class="flow-steps">
+      <span class="flow-step"><b>1</b>Input aset yang perlu pemeliharaan</span>
+      <span class="flow-step"><b>2</b>Catat jadwal / perbaikan</span>
+      <span class="flow-step"><b>3</b>Perbarui riwayat &amp; simpan</span>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Formulir pemeliharaan</h2><div class="desc">Aset yang sedang dipinjam tidak dapat dijadwalkan pemeliharaan</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
+        <form onsubmit="return handlePemeliharaanSubmit(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label for="pm-asset">Aset</label>
+              <select id="pm-asset">${assetOptions()}</select>
+            </div>
+            <div class="field">
+              <label for="pm-jenis">Jenis pemeliharaan</label>
+              <select id="pm-jenis">
+                <option value="Rutin">Rutin</option>
+                <option value="Perbaikan">Perbaikan</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="pm-jadwal">Tanggal jadwal / pelaksanaan</label>
+            <input id="pm-jadwal" type="date" value="${todayISO()}">
+          </div>
+          <div class="field">
+            <label for="pm-catatan">Catatan kerusakan / tindakan</label>
+            <textarea id="pm-catatan" rows="2" placeholder="mis. servis rutin AC, ganti sparepart..."></textarea>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan pemeliharaan</button></div>
+        </form>`}
+      </div>
+    </div>
+    ${renderPemeliharaanTable()}
+  `;
+}
+function renderPemeliharaanTable(){
+  const rows = [...state.data.pemeliharaan].sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Riwayat pemeliharaan</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Aset</th><th>Jenis</th><th>Catatan</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>`
+              <tr>
+                <td>${fmtDate(r.tanggal)}</td>
+                <td>${assetLabel(r.assetId)}</td>
+                <td>${escapeHtml(r.jenis)}</td>
+                <td>${escapeHtml(r.catatan||'—')}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td>${r.status==='Berjalan' ? `<button class="btn btn-ghost btn-sm" onclick="handleSelesaiPemeliharaan('${r.id}')">Tandai selesai</button>` : ''}</td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Belum ada riwayat pemeliharaan.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function handlePemeliharaanSubmit(ev){
+  ev.preventDefault();
+  const assetId = document.getElementById('pm-asset').value;
+  const jenis = document.getElementById('pm-jenis').value;
+  const jadwal = document.getElementById('pm-jadwal').value || todayISO();
+  const catatan = document.getElementById('pm-catatan').value.trim();
+  const asset = getAsset(assetId);
+
+  if(asset && asset.statusKetersediaan === 'Dipinjam'){
+    state.formSuccess.pemeliharaan = null;
+    state.formError.pemeliharaan = 'Aset sedang dipinjam sehingga belum dapat dijadwalkan pemeliharaan. Tunggu aset dikembalikan terlebih dahulu.';
+    renderApp(); return false;
+  }
+  const record = { id: uid('PML'), assetId, jenis, jadwal, catatan, status:'Berjalan', tanggal: todayISO() };
+  state.data.pemeliharaan.push(record);
+  if(asset) asset.statusKetersediaan = 'Pemeliharaan';
+  state.formError.pemeliharaan = null;
+  state.formSuccess.pemeliharaan = 'Jadwal pemeliharaan tersimpan dan status aset diperbarui menjadi Pemeliharaan.';
+  await saveCollection('pemeliharaan');
+  await saveCollection('assets');
+  renderApp();
+  return false;
+}
+async function handleSelesaiPemeliharaan(id){
+  const r = state.data.pemeliharaan.find(x=>x.id===id);
+  if(!r) return;
+  r.status = 'Selesai';
+  const asset = getAsset(r.assetId);
+  if(asset) asset.statusKetersediaan = 'Tersedia';
+  await saveCollection('pemeliharaan');
+  await saveCollection('assets');
+  renderApp();
+}
+
+/* ================= RENDER: IDENTIFIKASI ================= */
+function renderIdentifikasi(){
+  const err = state.formError.identifikasi;
+  const ok = state.formSuccess.identifikasi;
+  return `
+    <div class="flow-steps">
+      <span class="flow-step"><b>1</b>Input kode / label aset</span>
+      <span class="flow-step"><b>2</b>Tentukan lokasi &amp; kondisi</span>
+      <span class="flow-step"><b>3</b>Perbarui data &amp; simpan</span>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Formulir identifikasi</h2><div class="desc">Menetapkan lokasi dan kondisi terkini pada aset</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
+        <form onsubmit="return handleIdentifikasiSubmit(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label for="id-asset">Aset</label>
+              <select id="id-asset">${assetOptions()}</select>
+            </div>
+            <div class="field">
+              <label for="id-kondisi">Kondisi terkini</label>
+              <select id="id-kondisi">
+                <option value="Baik">Baik</option>
+                <option value="Rusak Ringan">Rusak Ringan</option>
+                <option value="Rusak Berat">Rusak Berat</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="id-lokasi">Lokasi saat ini</label>
+            <input id="id-lokasi" type="text" placeholder="mis. Bidang Pelatihan Kerja, Lantai 2">
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan identifikasi</button></div>
+        </form>`}
+      </div>
+    </div>
+    ${renderIdentifikasiTable()}
+  `;
+}
+function renderIdentifikasiTable(){
+  const rows = [...state.data.identifikasi].sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Riwayat identifikasi</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Kode aset</th><th>Aset</th><th>Lokasi</th><th>Kondisi</th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>{ const a=getAsset(r.assetId); return `
+              <tr>
+                <td>${fmtDate(r.tanggal)}</td>
+                <td class="mono">${a?escapeHtml(a.kode):'—'}</td>
+                <td>${a?escapeHtml(a.nama):'—'}</td>
+                <td>${escapeHtml(r.lokasi)}</td>
+                <td>${statusBadge(r.kondisi)}</td>
+              </tr>`; }).join('') : '<tr class="empty-row"><td colspan="5">Belum ada riwayat identifikasi.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function handleIdentifikasiSubmit(ev){
+  ev.preventDefault();
+  const assetId = document.getElementById('id-asset').value;
+  const kondisi = document.getElementById('id-kondisi').value;
+  const lokasi = document.getElementById('id-lokasi').value.trim();
+  if(!lokasi){
+    state.formError.identifikasi = 'Lokasi wajib diisi.';
+    renderApp(); return false;
+  }
+  const record = { id: uid('IDN'), assetId, lokasi, kondisi, tanggal: todayISO() };
+  state.data.identifikasi.push(record);
+  const asset = getAsset(assetId);
+  if(asset){ asset.lokasi = lokasi; asset.kondisi = kondisi; }
+  state.formError.identifikasi = null;
+  state.formSuccess.identifikasi = 'Data lokasi dan kondisi aset berhasil diperbarui.';
+  await saveCollection('identifikasi');
+  await saveCollection('assets');
+  renderApp();
+  return false;
+}
+
+/* ================= RENDER: PENCATATAN ================= */
+function renderPencatatan(){
+  const err = state.formError.pencatatan;
+  const ok = state.formSuccess.pencatatan;
+  return `
+    <div class="flow-steps">
+      <span class="flow-step"><b>1</b>Input data aset</span>
+      <span class="flow-step"><b>2</b>Simpan ke basis data</span>
+      <span class="flow-step"><b>3</b>Perbarui laporan BMD</span>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Logo untuk label cetak</h2><div class="desc">Unggah sekali, otomatis dipakai pada seluruh label aset yang dicetak</div></div></div>
+      <div class="panel-body">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div class="logo-preview-box">
+            ${state.settings.logoDataUrl
+              ? `<img src="${state.settings.logoDataUrl}" alt="Logo Kabupaten Sumedang">`
+              : `<div class="logo-placeholder-sm">LOGO<br>KAB.<br>SUMEDANG</div>`}
+          </div>
+          <div style="flex:1;min-width:220px;">
+            <input type="file" id="logo-upload" accept="image/*" onchange="handleLogoUpload(event)">
+            <div class="hint-text">Gunakan berkas logo resmi Kabupaten Sumedang (disarankan PNG latar transparan). Logo akan tercetak pada kolom kiri label sebesar 3 cm.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Daftarkan aset baru</h2><div class="desc">Aset yang tercatat di sini akan tersedia pada seluruh modul lain</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        <form onsubmit="return handlePencatatanSubmit(event)">
+          <div class="grid-3">
+            <div class="field">
+              <label for="pc-kode">Kode aset</label>
+              <input id="pc-kode" type="text" placeholder="mis. BMD-005">
+            </div>
+            <div class="field">
+              <label for="pc-kategori">Kategori</label>
+              <select id="pc-kategori">
+                <option>Elektronik</option>
+                <option>Furnitur</option>
+                <option>Kendaraan</option>
+                <option>Bangunan</option>
+                <option>Peralatan Kantor</option>
+                <option>Lainnya</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pc-tahun">Tahun perolehan</label>
+              <input id="pc-tahun" type="number" min="1980" max="2100" placeholder="2026">
+            </div>
+          </div>
+          <div class="field">
+            <label for="pc-nama">Nama aset</label>
+            <input id="pc-nama" type="text" placeholder="mis. Printer Canon PIXMA G3010">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pc-nilai">Nilai perolehan (Rp)</label>
+              <input id="pc-nilai" type="number" min="0" placeholder="mis. 2500000">
+            </div>
+            <div class="field">
+              <label for="pc-lokasi">Lokasi awal</label>
+              <input id="pc-lokasi" type="text" placeholder="mis. Sekretariat">
+            </div>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan aset</button></div>
+        </form>
+      </div>
+    </div>
+    ${renderPencatatanTable()}
+  `;
+}
+function renderPencatatanTable(){
+  const rows = [...state.data.assets].sort((a,b)=>b.dibuat.localeCompare(a.dibuat));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Daftar aset (BMD)</h2><div class="desc">${rows.length} aset tercatat</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Kode</th><th>Nama aset</th><th>Kategori</th><th>Lokasi</th><th>Kondisi</th><th>Ketersediaan</th><th>Verifikasi</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(a=>`
+              <tr>
+                <td class="mono">${escapeHtml(a.kode)}</td>
+                <td>${escapeHtml(a.nama)}</td>
+                <td>${escapeHtml(a.kategori)}</td>
+                <td>${escapeHtml(a.lokasi||'—')}</td>
+                <td>${statusBadge(a.kondisi)}</td>
+                <td>${statusBadge(a.statusKetersediaan)}</td>
+                <td>${statusBadge(a.statusVerifikasi)}</td>
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="handlePrintLabel('${a.id}')">Cetak label</button>
+                  <button class="btn btn-ghost btn-sm" onclick="handleHapusAset('${a.id}')">Hapus</button>
+                </td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="8">Belum ada aset tercatat.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function handlePencatatanSubmit(ev){
+  ev.preventDefault();
+  const kode = document.getElementById('pc-kode').value.trim();
+  const nama = document.getElementById('pc-nama').value.trim();
+  const kategori = document.getElementById('pc-kategori').value;
+  const tahun = document.getElementById('pc-tahun').value.trim();
+  const nilai = document.getElementById('pc-nilai').value.trim();
+  const lokasi = document.getElementById('pc-lokasi').value.trim();
+
+  if(!kode || !nama){
+    state.formError.pencatatan = 'Kode aset dan nama aset wajib diisi.';
+    renderApp(); return false;
+  }
+  if(state.data.assets.some(a=>a.kode.toLowerCase()===kode.toLowerCase())){
+    state.formError.pencatatan = `Kode aset "${escapeHtml(kode)}" sudah digunakan. Gunakan kode lain.`;
+    renderApp(); return false;
+  }
+  const asset = {
+    id: uid('AST'), kode, nama, kategori, tahun, nilai, lokasi,
+    kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
+    dibuat: todayISO()
+  };
+  state.data.assets.push(asset);
+  state.formError.pencatatan = null;
+  state.formSuccess.pencatatan = `Aset ${escapeHtml(kode)} berhasil disimpan ke basis data.`;
+  await saveCollection('assets');
+  renderApp();
+  return false;
+}
+async function handleHapusAset(id){
+  if(!confirm('Hapus aset ini beserta riwayat yang tercatat? Tindakan ini tidak dapat dibatalkan.')) return;
+  state.data.assets = state.data.assets.filter(a=>a.id!==id);
+  state.data.verifikasi = state.data.verifikasi.filter(r=>r.assetId!==id);
+  state.data.peminjaman = state.data.peminjaman.filter(r=>r.assetId!==id);
+  state.data.pemeliharaan = state.data.pemeliharaan.filter(r=>r.assetId!==id);
+  state.data.identifikasi = state.data.identifikasi.filter(r=>r.assetId!==id);
+  await Promise.all(['assets','verifikasi','peminjaman','pemeliharaan','identifikasi'].map(saveCollection));
+  renderApp();
+}
+
+/* ================= LOGO & CETAK LABEL ================= */
+function handleLogoUpload(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    state.settings.logoDataUrl = e.target.result;
+    await saveSettings();
+    renderApp();
+  };
+  reader.onerror = function(){ alert('Gagal membaca berkas logo. Coba berkas lain.'); };
+  reader.readAsDataURL(file);
+}
+
+function labelPayloadText(asset){
+  return [
+    'SIMPATI - Informasi Aset',
+    'Kode: ' + asset.kode,
+    'Nama: ' + asset.nama,
+    'Kategori: ' + asset.kategori,
+    'Lokasi: ' + (asset.lokasi || '-'),
+    'Kondisi: ' + asset.kondisi,
+    'Tahun perolehan: ' + (asset.tahun || '-')
+  ].join('\n');
+}
+
+function buildLabelHtml(asset){
+  const logo = state.settings.logoDataUrl
+    ? `<img src="${state.settings.logoDataUrl}" alt="Logo Kabupaten Sumedang">`
+    : `<div class="logo-placeholder">LOGO<br>KAB. SUMEDANG</div>`;
+  return `
+    <div class="label">
+      <div class="label-col label-logo">${logo}</div>
+      <div class="label-col label-kode">
+        <div class="label-instansi">DISNAKERTRANS<br>KAB. SUMEDANG</div>
+        <div class="label-kode-text">${escapeHtml(asset.kode)}</div>
+        <div class="label-nama-text">${escapeHtml(asset.nama)}</div>
+      </div>
+      <div class="label-col label-qr">
+        <div class="qr-box" id="label-qr-box"></div>
+        <div class="qr-caption">Pindai untuk info aset</div>
+      </div>
+    </div>
+  `;
+}
+
+function handlePrintLabel(assetId){
+  const asset = getAsset(assetId);
+  if(!asset) return;
+  const area = document.getElementById('print-label-area');
+  area.innerHTML = buildLabelHtml(asset);
+
+  const qrBox = document.getElementById('label-qr-box');
+  qrBox.innerHTML = '';
+  if(window.QRCode){
+    new QRCode(qrBox, {
+      text: labelPayloadText(asset),
+      width: 94,
+      height: 94,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } else {
+    qrBox.innerHTML = '<div style="font-size:7px;color:#900;">QR gagal dimuat (perlu koneksi internet saat pertama kali mencetak)</div>';
+  }
+
+  document.body.classList.add('printing-label');
+  setTimeout(function(){ window.print(); }, 100);
+}
+
+window.addEventListener('afterprint', function(){
+  document.body.classList.remove('printing-label');
+});
+
+/* ================= RENDER: LAPORAN ================= */
+function renderLaporan(){
+  const a = state.data.assets;
+  const total = a.length;
+  const tersedia = a.filter(x=>x.statusKetersediaan==='Tersedia').length;
+  const dipinjam = a.filter(x=>x.statusKetersediaan==='Dipinjam').length;
+  const pemeliharaan = a.filter(x=>x.statusKetersediaan==='Pemeliharaan').length;
+  const terverifikasi = a.filter(x=>x.statusVerifikasi==='Terverifikasi').length;
+
+  return `
+    <div id="print-hide" style="margin-bottom:16px;">
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">Cetak laporan</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset</div></div>
+      <div class="stat-card c-good"><div class="num">${terverifikasi}</div><div class="lbl">Terverifikasi</div></div>
+      <div class="stat-card c-warn"><div class="num">${dipinjam}</div><div class="lbl">Dipinjam</div></div>
+      <div class="stat-card c-bad"><div class="num">${pemeliharaan}</div><div class="lbl">Pemeliharaan</div></div>
+      <div class="stat-card c-good"><div class="num">${tersedia}</div><div class="lbl">Tersedia</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Rekap inventaris barang milik daerah</h2><div class="desc">Kondisi dan status terkini seluruh aset</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Kode</th><th>Nama aset</th><th>Kategori</th><th>Lokasi</th><th>Kondisi</th><th>Ketersediaan</th><th>Verifikasi</th></tr></thead>
+          <tbody>
+            ${a.length ? a.map(x=>`
+              <tr>
+                <td class="mono">${escapeHtml(x.kode)}</td>
+                <td>${escapeHtml(x.nama)}</td>
+                <td>${escapeHtml(x.kategori)}</td>
+                <td>${escapeHtml(x.lokasi||'—')}</td>
+                <td>${statusBadge(x.kondisi)}</td>
+                <td>${statusBadge(x.statusKetersediaan)}</td>
+                <td>${statusBadge(x.statusVerifikasi)}</td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="7">Belum ada data aset.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Riwayat peminjaman aktif</h2></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>No. Surat</th><th>Aset</th><th>Peminjam</th><th>Unit</th><th>Pinjam</th><th>Rencana kembali</th></tr></thead>
+          <tbody>
+            ${state.data.peminjaman.filter(r=>r.status==='Dipinjam').length ?
+              state.data.peminjaman.filter(r=>r.status==='Dipinjam').map(r=>`
+                <tr><td class="mono">${r.nomorSurat}</td><td>${assetLabel(r.assetId)}</td><td>${escapeHtml(r.peminjam)}</td><td>${escapeHtml(r.unit||'—')}</td><td>${fmtDate(r.tglPinjam)}</td><td>${fmtDate(r.rencanaKembali)}</td></tr>
+              `).join('') : '<tr class="empty-row"><td colspan="6">Tidak ada peminjaman aktif.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Aset dalam pemeliharaan</h2></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Aset</th><th>Jenis</th><th>Catatan</th></tr></thead>
+          <tbody>
+            ${state.data.pemeliharaan.filter(r=>r.status==='Berjalan').length ?
+              state.data.pemeliharaan.filter(r=>r.status==='Berjalan').map(r=>`
+                <tr><td>${fmtDate(r.tanggal)}</td><td>${assetLabel(r.assetId)}</td><td>${escapeHtml(r.jenis)}</td><td>${escapeHtml(r.catatan||'—')}</td></tr>
+              `).join('') : '<tr class="empty-row"><td colspan="4">Tidak ada pemeliharaan berjalan.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* ================= MASTER RENDER ================= */
+function renderApp(){
+  renderNav();
+  const [title, desc] = TITLES[state.view] || TITLES.beranda;
+  document.getElementById('topbar-title').textContent = title;
+  document.getElementById('topbar-desc').textContent = desc;
+
+  let html = '';
+  switch(state.view){
+    case 'verifikasi': html = renderVerifikasi(); break;
+    case 'peminjaman': html = renderPeminjaman(); break;
+    case 'pemeliharaan': html = renderPemeliharaan(); break;
+    case 'identifikasi': html = renderIdentifikasi(); break;
+    case 'pencatatan': html = renderPencatatan(); break;
+    case 'laporan': html = renderLaporan(); break;
+    default: html = renderBeranda();
+  }
+  document.getElementById('content').innerHTML = html;
+}
+
+/* ================= BOOTSTRAP ================= */
+(async function boot(){
+  document.getElementById('content').innerHTML = '<p style="color:var(--ink-soft);font-size:13px;">Memuat data...</p>';
+  await initData();
+})();
+</script>
+</body>
+</html>
