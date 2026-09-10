@@ -596,6 +596,7 @@ const state = {
   loaded: false,
   pencatatanKategori: 'A',
   editingAssetId: null,
+  excelImportStaged: null,
   data: { assets: [], verifikasi: [], peminjaman: [], pemeliharaan: [], identifikasi: [] },
   formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
   formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
@@ -681,16 +682,41 @@ function normalizeKib(v){
 }
 
 /* ---------------- STORAGE ---------------- */
+/* ---------------- PENYIMPANAN ----------------
+   window.storage hanya tersedia di dalam Claude. Saat situs ini dijalankan
+   sebagai halaman biasa (mis. di Netlify), kita pakai localStorage milik
+   browser supaya data tetap tersimpan setelah halaman dimuat ulang.
+   Catatan: localStorage bersifat per-perangkat/per-browser, bukan dibagikan
+   antar pengguna seperti window.storage di dalam Claude. */
+const HAS_CLAUDE_STORAGE = (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function');
+const LOCAL_PREFIX = 'simpati:';
+
+async function storageGetRaw(key){
+  if(HAS_CLAUDE_STORAGE){
+    try{
+      const res = await window.storage.get(key, true);
+      return (res && res.value) ? res.value : null;
+    }catch(e){ return null; }
+  }
+  try{ return localStorage.getItem(LOCAL_PREFIX + key); }catch(e){ return null; }
+}
+async function storageSetRaw(key, value){
+  if(HAS_CLAUDE_STORAGE){
+    try{ await window.storage.set(key, value, true); return true; }catch(e){ console.error('Gagal menyimpan (Claude storage)', e); return false; }
+  }
+  try{ localStorage.setItem(LOCAL_PREFIX + key, value); return true; }catch(e){ console.error('Gagal menyimpan (localStorage)', e); return false; }
+}
+
 async function loadCollection(key){
   try{
-    const res = await window.storage.get(key, true);
-    if(res && res.value){ return JSON.parse(res.value); }
+    const raw = await storageGetRaw(key);
+    if(raw){ return JSON.parse(raw); }
     return null;
   }catch(e){ return null; }
 }
 async function saveCollection(key){
   try{
-    await window.storage.set(key, JSON.stringify(state.data[key]), true);
+    await storageSetRaw(key, JSON.stringify(state.data[key]));
   }catch(e){ console.error('Gagal menyimpan '+key, e); }
 }
 
@@ -749,6 +775,7 @@ function handleLogout(){
 function goTo(view){
   state.view = view;
   state.editingAssetId = null;
+  state.excelImportStaged = null;
   Object.keys(state.formError).forEach(k=>state.formError[k]=null);
   Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
   renderApp();
@@ -1259,6 +1286,12 @@ function renderPencatatan(){
           </label>
         </div>
         <p class="hint-text" style="margin-top:10px;">Kolom template mengikuti format resmi KIB A (Tanah), KIB B (Peralatan dan Mesin), KIB C (Gedung dan Bangunan), dan KIB D (Jalan, Irigasi, dan Jaringan). Kolom "Kategori KIB" menentukan jenis tiap baris aset; kolom yang tidak relevan untuk kategori tertentu boleh dikosongkan.</p>
+        ${state.excelImportStaged ? `
+          <div class="form-actions" style="margin-top:14px;">
+            <button type="button" class="btn btn-primary" onclick="handleConfirmImportExcel()">Simpan aset</button>
+            <button type="button" class="btn btn-ghost" onclick="handleCancelImportExcel()">Batal</button>
+          </div>
+        ` : ''}
       </div>
     </div>
     <div class="panel" id="form-aset-panel">
@@ -1352,13 +1385,15 @@ function handleExcelFileChange(ev){
   const file = ev.target.files && ev.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = async function(e){
+  reader.onload = function(e){
     try{
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, {type:'array'});
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
-      let imported = 0, renamed = 0, skipped = 0;
+      const stagedAssets = [];
+      const existingKodes = new Set(state.data.assets.map(a=>a.kode.toLowerCase()));
+      let renamed = 0, skipped = 0;
       rows.forEach(row => {
         const draft = {};
         Object.keys(row).forEach(ownHeader => {
@@ -1370,7 +1405,7 @@ function handleExcelFileChange(ev){
         if(!draft.nama){ skipped++; return; }
         const kib = normalizeKib(draft.kib);
         let kode = draft.kodeBarang || draft.nibar || uid('BMD');
-        if(state.data.assets.some(a=>a.kode.toLowerCase()===kode.toLowerCase())){
+        if(existingKodes.has(kode.toLowerCase()) || stagedAssets.some(s=>s.kode.toLowerCase()===kode.toLowerCase())){
           kode = kode + '-' + uid('X').slice(-4);
           renamed++;
         }
@@ -1380,17 +1415,24 @@ function handleExcelFileChange(ev){
           kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
           dibuat: todayISO(), tahun
         }, draft, { kode });
-        state.data.assets.push(asset);
-        imported++;
+        stagedAssets.push(asset);
       });
-      if(imported > 0){ await saveCollection('assets'); }
-      state.formError.importExcel = null;
-      let msg = imported + ' aset berhasil diimpor.';
-      if(renamed>0) msg += ' ' + renamed + ' kode diubah otomatis karena duplikat.';
-      if(skipped>0) msg += ' ' + skipped + ' baris dilewati karena kolom Nama Barang kosong.';
-      state.formSuccess.importExcel = msg;
+      if(stagedAssets.length === 0){
+        state.excelImportStaged = null;
+        state.formSuccess.importExcel = null;
+        state.formError.importExcel = 'Tidak ada baris yang bisa diimpor. Pastikan kolom "Nama Barang" terisi pada berkas.';
+      } else {
+        state.excelImportStaged = { assets: stagedAssets, renamed, skipped };
+        state.formError.importExcel = null;
+        let msg = stagedAssets.length + ' aset siap diimpor.';
+        if(renamed>0) msg += ' ' + renamed + ' kode diubah otomatis karena duplikat.';
+        if(skipped>0) msg += ' ' + skipped + ' baris dilewati karena kolom Nama Barang kosong.';
+        msg += ' Klik "Simpan aset" untuk menyimpannya ke basis data.';
+        state.formSuccess.importExcel = msg;
+      }
     }catch(err){
       console.error(err);
+      state.excelImportStaged = null;
       state.formSuccess.importExcel = null;
       state.formError.importExcel = 'Gagal membaca berkas Excel. Pastikan formatnya sesuai template lalu coba lagi.';
     }
@@ -1398,10 +1440,27 @@ function handleExcelFileChange(ev){
     renderApp();
   };
   reader.onerror = function(){
+    state.excelImportStaged = null;
     state.formError.importExcel = 'Gagal membaca berkas. Coba unggah ulang.';
     renderApp();
   };
   reader.readAsArrayBuffer(file);
+}
+async function handleConfirmImportExcel(){
+  if(!state.excelImportStaged) return;
+  const count = state.excelImportStaged.assets.length;
+  state.data.assets.push(...state.excelImportStaged.assets);
+  await saveCollection('assets');
+  state.excelImportStaged = null;
+  state.formError.importExcel = null;
+  state.formSuccess.importExcel = count + ' aset berhasil disimpan ke basis data.';
+  renderApp();
+}
+function handleCancelImportExcel(){
+  state.excelImportStaged = null;
+  state.formError.importExcel = null;
+  state.formSuccess.importExcel = null;
+  renderApp();
 }
 async function handlePencatatanSubmit(ev){
   ev.preventDefault();
