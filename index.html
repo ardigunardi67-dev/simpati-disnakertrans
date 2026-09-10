@@ -595,6 +595,7 @@ const state = {
   view: 'beranda',
   loaded: false,
   pencatatanKategori: 'A',
+  editingAssetId: null,
   data: { assets: [], verifikasi: [], peminjaman: [], pemeliharaan: [], identifikasi: [] },
   formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
   formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
@@ -747,6 +748,7 @@ function handleLogout(){
 /* ---------------- NAV / SHELL ---------------- */
 function goTo(view){
   state.view = view;
+  state.editingAssetId = null;
   Object.keys(state.formError).forEach(k=>state.formError[k]=null);
   Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
   renderApp();
@@ -1237,6 +1239,7 @@ function renderPencatatan(){
   const impOk = state.formSuccess.importExcel;
   const kib = state.pencatatanKategori;
   const dynamicFields = FIELD_DEFS.filter(f => fieldAppliesTo(f, kib));
+  const editingAsset = state.editingAssetId ? getAsset(state.editingAssetId) : null;
   return `
     <div class="flow-steps">
       <span class="flow-step"><b>1</b>Input data aset (manual atau Excel)</span>
@@ -1258,8 +1261,10 @@ function renderPencatatan(){
         <p class="hint-text" style="margin-top:10px;">Kolom template mengikuti format resmi KIB A (Tanah), KIB B (Peralatan dan Mesin), KIB C (Gedung dan Bangunan), dan KIB D (Jalan, Irigasi, dan Jaringan). Kolom "Kategori KIB" menentukan jenis tiap baris aset; kolom yang tidak relevan untuk kategori tertentu boleh dikosongkan.</p>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-head"><div><h2>Daftarkan aset baru (manual)</h2><div class="desc">Kolom formulir menyesuaikan kategori KIB yang dipilih</div></div></div>
+    <div class="panel" id="form-aset-panel">
+      <div class="panel-head">
+        <div><h2>${editingAsset ? 'Edit aset' : 'Daftarkan aset baru (manual)'}</h2><div class="desc">${editingAsset ? 'Mengubah data aset "' + escapeHtml(editingAsset.nama) + '"' : 'Kolom formulir menyesuaikan kategori KIB yang dipilih'}</div></div>
+      </div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
@@ -1277,11 +1282,14 @@ function renderPencatatan(){
             ${dynamicFields.map(f => `
               <div class="field">
                 <label for="pc-${f.key}">${f.header}${f.required?' *':''}</label>
-                <input id="pc-${f.key}" type="${f.type==='number'?'number':(f.type==='date'?'date':'text')}" ${f.type==='number'?'min="0"':''} placeholder="${f.header}">
+                <input id="pc-${f.key}" type="${f.type==='number'?'number':(f.type==='date'?'date':'text')}" ${f.type==='number'?'min="0"':''} placeholder="${f.header}" value="${editingAsset ? escapeHtml(editingAsset[f.key]||'') : ''}">
               </div>
             `).join('')}
           </div>
-          <div class="form-actions" style="margin-top:14px;"><button type="submit" class="btn btn-primary">Simpan aset</button></div>
+          <div class="form-actions" style="margin-top:14px;">
+            <button type="submit" class="btn btn-primary">${editingAsset ? 'Simpan perubahan' : 'Simpan aset'}</button>
+            ${editingAsset ? `<button type="button" class="btn btn-ghost" onclick="handleCancelEditAsset()">Batal edit</button>` : ''}
+          </div>
         </form>
       </div>
     </div>
@@ -1309,6 +1317,7 @@ function renderPencatatanTable(){
                 <td style="white-space:nowrap;">
                   <button class="btn btn-ghost btn-sm" onclick="openAssetDetail('${a.id}')">Detail</button>
                   <button class="btn btn-ghost btn-sm" onclick="handlePrintLabel('${a.id}')">Cetak label</button>
+                  <button class="btn btn-ghost btn-sm" onclick="handleEditAsset('${a.id}')">Edit</button>
                   <button class="btn btn-ghost btn-sm" onclick="handleHapusAset('${a.id}')">Hapus</button>
                 </td>
               </tr>`).join('') : '<tr class="empty-row"><td colspan="8">Belum ada aset tercatat.</td></tr>'}
@@ -1409,25 +1418,57 @@ async function handlePencatatanSubmit(ev){
     state.formError.pencatatan = 'Nama Barang wajib diisi.';
     renderApp(); return false;
   }
-  const kode = draft.kodeBarang || draft.nibar || uid('BMD');
-  if(state.data.assets.some(a=>a.kode.toLowerCase()===kode.toLowerCase())){
+  const editingId = state.editingAssetId;
+  const kode = draft.kodeBarang || draft.nibar || (editingId ? getAsset(editingId).kode : uid('BMD'));
+  const duplicate = state.data.assets.some(a => a.kode.toLowerCase()===kode.toLowerCase() && a.id !== editingId);
+  if(duplicate){
     state.formError.pencatatan = 'Kode "' + escapeHtml(kode) + '" sudah digunakan. Isi Kode Barang atau NIBAR yang berbeda.';
     renderApp(); return false;
   }
   const tahun = draft.tanggalPerolehan ? draft.tanggalPerolehan.slice(0,4) : '';
-  const asset = Object.assign({
-    id: uid('AST'), kib, kode, kategori: KIB_CATEGORIES[kib],
-    kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
-    dibuat: todayISO(), tahun
-  }, draft, { kode });
-  state.data.assets.push(asset);
-  state.formError.pencatatan = null;
-  state.formSuccess.pencatatan = 'Aset "' + escapeHtml(draft.nama) + '" (' + escapeHtml(kode) + ') berhasil disimpan ke basis data.';
+
+  if(editingId){
+    const existing = getAsset(editingId);
+    if(existing){
+      Object.assign(existing, draft, { kib, kode, kategori: KIB_CATEGORIES[kib], tahun });
+    }
+    state.editingAssetId = null;
+    state.formError.pencatatan = null;
+    state.formSuccess.pencatatan = 'Perubahan pada aset "' + escapeHtml(draft.nama) + '" (' + escapeHtml(kode) + ') berhasil disimpan.';
+  } else {
+    const asset = Object.assign({
+      id: uid('AST'), kib, kode, kategori: KIB_CATEGORIES[kib],
+      kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
+      dibuat: todayISO(), tahun
+    }, draft, { kode });
+    state.data.assets.push(asset);
+    state.formError.pencatatan = null;
+    state.formSuccess.pencatatan = 'Aset "' + escapeHtml(draft.nama) + '" (' + escapeHtml(kode) + ') berhasil disimpan ke basis data.';
+  }
   await saveCollection('assets');
   renderApp();
   return false;
 }
+function handleEditAsset(id){
+  const asset = getAsset(id);
+  if(!asset) return;
+  state.editingAssetId = id;
+  state.pencatatanKategori = asset.kib || 'A';
+  state.formError.pencatatan = null;
+  state.formSuccess.pencatatan = null;
+  renderApp();
+  const panel = document.getElementById('form-aset-panel');
+  if(panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function handleCancelEditAsset(){
+  state.editingAssetId = null;
+  state.formError.pencatatan = null;
+  state.formSuccess.pencatatan = null;
+  renderApp();
+}
 async function handleHapusAset(id){
+  if(state.editingAssetId === id){ state.editingAssetId = null; }
+
   if(!confirm('Hapus aset ini beserta riwayat yang tercatat? Tindakan ini tidak dapat dibatalkan.')) return;
   state.data.assets = state.data.assets.filter(a=>a.id!==id);
   state.data.verifikasi = state.data.verifikasi.filter(r=>r.assetId!==id);
