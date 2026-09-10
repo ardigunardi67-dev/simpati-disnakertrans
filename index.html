@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --navy-900:#0F3550;
@@ -320,7 +321,28 @@
 
   .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  .grid-auto{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px; }
   @media (max-width:720px){ .grid-2, .grid-3{ grid-template-columns:1fr; } }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(15,53,80,0.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50; padding:24px;
+  }
+  .modal-box{
+    background:var(--surface); width:100%; max-width:560px; max-height:82vh;
+    display:flex; flex-direction:column; border-top:4px solid var(--navy-700);
+    box-shadow:0 24px 60px rgba(6,20,32,0.35);
+  }
+  .modal-head{
+    padding:16px 20px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .modal-head h3{ margin:0; font-size:15.5px; color:var(--navy-900); }
+  .modal-body{ padding:16px 20px; overflow-y:auto; }
+  .detail-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .detail-table td{ padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .detail-table td:first-child{ color:var(--ink-soft); width:46%; font-weight:500; }
 
   .checklist-row{
     display:flex; align-items:flex-start; gap:10px;
@@ -556,6 +578,7 @@
 </div>
 
 <div id="print-label-area"></div>
+<div id="detail-modal-area"></div>
 
 <script>
 /* =========================================================
@@ -571,18 +594,19 @@ const state = {
   username: '',
   view: 'beranda',
   loaded: false,
+  pencatatanKategori: 'A',
   data: { assets: [], verifikasi: [], peminjaman: [], pemeliharaan: [], identifikasi: [] },
-  formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null },
-  formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null }
+  formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
+  formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
 };
 
 const NAV_ITEMS = [
   { key:'beranda', label:'Beranda' },
-  { key:'verifikasi', label:'Verifikasi' },
+  { key:'pencatatan', label:'Pencatatan Aset' },
+  { key:'identifikasi', label:'Identifikasi' },
   { key:'peminjaman', label:'Peminjaman' },
   { key:'pemeliharaan', label:'Pemeliharaan' },
-  { key:'identifikasi', label:'Identifikasi' },
-  { key:'pencatatan', label:'Pencatatan Aset' },
+  { key:'verifikasi', label:'Verifikasi' },
   { key:'laporan', label:'Laporan' }
 ];
 
@@ -590,6 +614,70 @@ function uid(prefix){ return prefix + '-' + Date.now().toString(36) + Math.rando
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; try{ const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});}catch(e){ return d; } }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- KLASIFIKASI KIB (Kartu Inventaris Barang) ---------------- */
+const KIB_CATEGORIES = {
+  A: 'Tanah',
+  B: 'Peralatan dan Mesin',
+  C: 'Gedung dan Bangunan',
+  D: 'Jalan, Irigasi, dan Jaringan'
+};
+
+/* Susunan kolom mengikuti kepala kolom pada Daftar BMD (KIB A/B/C/D).
+   'kib' kosong berarti kolom berlaku untuk semua kategori. */
+const FIELD_DEFS = [
+  { key:'kodeBarang', header:'Kode Barang', type:'text' },
+  { key:'nama', header:'Nama Barang', type:'text', required:true },
+  { key:'nibar', header:'NIBAR', type:'text' },
+  { key:'nomorRegister', header:'Nomor Register', type:'text' },
+  { key:'spesifikasi', header:'Spesifikasi Nama Barang', type:'text' },
+  { key:'spesifikasiLainnya', header:'Spesifikasi Lainnya', type:'text' },
+  { key:'merekTipe', header:'Merek/Tipe', type:'text', kib:['B'] },
+  { key:'jumlahLantai', header:'Jumlah Lantai', type:'number', kib:['C'] },
+  { key:'noRuas', header:'No. Ruas Jalan/Jembatan/Jaringan Irigasi', type:'text', kib:['D'] },
+  { key:'luas', header:'Luas', type:'text', kib:['A','C'] },
+  { key:'lokasi', header:'Lokasi', type:'text' },
+  { key:'titikKoordinat', header:'Titik Koordinat', type:'text' },
+  { key:'statusKepemilikanTanah', header:'Status Kepemilikan Tanah', type:'text', kib:['C','D'] },
+  { key:'nomorPolisi', header:'Nomor Polisi', type:'text', kib:['B'] },
+  { key:'nomorRangka', header:'Nomor Rangka', type:'text', kib:['B'] },
+  { key:'nomorBpkb', header:'Nomor BPKB', type:'text', kib:['B'] },
+  { key:'buktiKepemilikanNama', header:'Bukti Kepemilikan (Nama)', type:'text', kib:['A'] },
+  { key:'buktiKepemilikanNomor', header:'Bukti Kepemilikan (Nomor)', type:'text', kib:['A'] },
+  { key:'buktiKepemilikanTanggal', header:'Bukti Kepemilikan (Tanggal)', type:'date', kib:['A'] },
+  { key:'namaKepemilikanDokumen', header:'Nama Kepemilikan Dalam Dokumen', type:'text', kib:['A'] },
+  { key:'jumlah', header:'Jumlah', type:'number' },
+  { key:'satuan', header:'Satuan', type:'text' },
+  { key:'hargaSatuan', header:'Harga Satuan Perolehan (Rp)', type:'number' },
+  { key:'nilai', header:'Nilai Perolehan (Rp)', type:'number' },
+  { key:'caraPerolehan', header:'Cara Perolehan', type:'text' },
+  { key:'tanggalPerolehan', header:'Tanggal Perolehan', type:'date' },
+  { key:'statusPenggunaan', header:'Status Penggunaan', type:'text' },
+  { key:'keterangan', header:'Keterangan', type:'text' }
+];
+const KIB_HEADER = { key:'kib', header:'Kategori KIB (A/B/C/D)' };
+
+function fieldAppliesTo(field, kib){ return !field.kib || field.kib.includes(kib); }
+function blankKibFields(){
+  const o = {};
+  FIELD_DEFS.forEach(f => { o[f.key] = ''; });
+  return o;
+}
+function normalizeHeader(h){
+  return String(h||'').toLowerCase().replace(/[()./]/g,' ').replace(/\s+/g,' ').trim();
+}
+const HEADER_KEY_MAP = {};
+[KIB_HEADER, ...FIELD_DEFS].forEach(d => { HEADER_KEY_MAP[normalizeHeader(d.header)] = d.key; });
+function normalizeKib(v){
+  const s = String(v||'').trim().toUpperCase();
+  if(['A','B','C','D'].includes(s)) return s;
+  const low = s.toLowerCase();
+  if(low.includes('tanah')) return 'A';
+  if(low.includes('peralatan') || low.includes('mesin')) return 'B';
+  if(low.includes('gedung') || low.includes('bangunan')) return 'C';
+  if(low.includes('jalan') || low.includes('irigasi') || low.includes('jaringan')) return 'D';
+  return 'B';
+}
 
 /* ---------------- STORAGE ---------------- */
 async function loadCollection(key){
@@ -607,10 +695,10 @@ async function saveCollection(key){
 
 function seedData(){
   state.data.assets = [
-    { id: uid('AST'), kode:'BMD-001', nama:'Laptop Dell Latitude 5420', kategori:'Elektronik', tahun:'2023', nilai:'12500000', lokasi:'Bidang Penempatan Tenaga Kerja', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
-    { id: uid('AST'), kode:'BMD-002', nama:'Kendaraan Dinas Avanza B 1234 XX', kategori:'Kendaraan', tahun:'2021', nilai:'220000000', lokasi:'Garasi Kantor', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
-    { id: uid('AST'), kode:'BMD-003', nama:'Meja Kerja Kayu Jati', kategori:'Furnitur', tahun:'2019', nilai:'1500000', lokasi:'Bidang Transmigrasi', kondisi:'Rusak Ringan', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() },
-    { id: uid('AST'), kode:'BMD-004', nama:'Proyektor Epson EB-X05', kategori:'Elektronik', tahun:'2022', nilai:'5200000', lokasi:'Ruang Rapat Utama', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO() }
+    { id: uid('AST'), kib:'B', kode:'BMD-001', nama:'Laptop Dell Latitude 5420', kategori:KIB_CATEGORIES.B, tahun:'2023', nilai:'12500000', lokasi:'Bidang Penempatan Tenaga Kerja', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO(), ...blankKibFields(), nama:'Laptop Dell Latitude 5420', jumlah:'1', satuan:'Unit', hargaSatuan:'12500000', tanggalPerolehan:'2023-05-10' },
+    { id: uid('AST'), kib:'B', kode:'BMD-002', nama:'Kendaraan Dinas Avanza B 1234 XX', kategori:KIB_CATEGORIES.B, tahun:'2021', nilai:'220000000', lokasi:'Garasi Kantor', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO(), ...blankKibFields(), nama:'Kendaraan Dinas Avanza B 1234 XX', jumlah:'1', satuan:'Unit', hargaSatuan:'220000000', tanggalPerolehan:'2021-03-15', nomorPolisi:'B 1234 XX' },
+    { id: uid('AST'), kib:'B', kode:'BMD-003', nama:'Meja Kerja Kayu Jati', kategori:KIB_CATEGORIES.B, tahun:'2019', nilai:'1500000', lokasi:'Bidang Transmigrasi', kondisi:'Rusak Ringan', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO(), ...blankKibFields(), nama:'Meja Kerja Kayu Jati', jumlah:'1', satuan:'Unit', hargaSatuan:'1500000', tanggalPerolehan:'2019-01-20' },
+    { id: uid('AST'), kib:'B', kode:'BMD-004', nama:'Proyektor Epson EB-X05', kategori:KIB_CATEGORIES.B, tahun:'2022', nilai:'5200000', lokasi:'Ruang Rapat Utama', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO(), ...blankKibFields(), nama:'Proyektor Epson EB-X05', jumlah:'1', satuan:'Unit', hargaSatuan:'5200000', tanggalPerolehan:'2022-08-01' }
   ];
   state.data.verifikasi = [];
   state.data.peminjaman = [];
@@ -1145,54 +1233,55 @@ async function handleIdentifikasiSubmit(ev){
 function renderPencatatan(){
   const err = state.formError.pencatatan;
   const ok = state.formSuccess.pencatatan;
+  const impErr = state.formError.importExcel;
+  const impOk = state.formSuccess.importExcel;
+  const kib = state.pencatatanKategori;
+  const dynamicFields = FIELD_DEFS.filter(f => fieldAppliesTo(f, kib));
   return `
     <div class="flow-steps">
-      <span class="flow-step"><b>1</b>Input data aset</span>
+      <span class="flow-step"><b>1</b>Input data aset (manual atau Excel)</span>
       <span class="flow-step"><b>2</b>Simpan ke basis data</span>
       <span class="flow-step"><b>3</b>Perbarui laporan BMD</span>
     </div>
     <div class="panel">
-      <div class="panel-head"><div><h2>Daftarkan aset baru</h2><div class="desc">Aset yang tercatat di sini akan tersedia pada seluruh modul lain</div></div></div>
+      <div class="panel-head"><div><h2>Unggah data dari Excel</h2><div class="desc">Isi template resmi, lalu unggah untuk menambahkan banyak aset sekaligus</div></div></div>
+      <div class="panel-body">
+        ${impErr ? `<div class="alert alert-bad">${impErr}</div>` : ''}
+        ${impOk ? `<div class="alert alert-good">${impOk}</div>` : ''}
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <button type="button" class="btn btn-ghost" onclick="handleDownloadTemplate()">Unduh template Excel</button>
+          <label class="btn btn-primary" style="cursor:pointer;margin:0;">
+            Unggah file Excel
+            <input type="file" accept=".xlsx,.xls" onchange="handleExcelFileChange(event)" style="display:none;">
+          </label>
+        </div>
+        <p class="hint-text" style="margin-top:10px;">Kolom template mengikuti format resmi KIB A (Tanah), KIB B (Peralatan dan Mesin), KIB C (Gedung dan Bangunan), dan KIB D (Jalan, Irigasi, dan Jaringan). Kolom "Kategori KIB" menentukan jenis tiap baris aset; kolom yang tidak relevan untuk kategori tertentu boleh dikosongkan.</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><h2>Daftarkan aset baru (manual)</h2><div class="desc">Kolom formulir menyesuaikan kategori KIB yang dipilih</div></div></div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
         <form onsubmit="return handlePencatatanSubmit(event)">
-          <div class="grid-3">
-            <div class="field">
-              <label for="pc-kode">Kode aset</label>
-              <input id="pc-kode" type="text" placeholder="mis. BMD-005">
-            </div>
-            <div class="field">
-              <label for="pc-kategori">Kategori</label>
-              <select id="pc-kategori">
-                <option>Elektronik</option>
-                <option>Furnitur</option>
-                <option>Kendaraan</option>
-                <option>Bangunan</option>
-                <option>Peralatan Kantor</option>
-                <option>Lainnya</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="pc-tahun">Tahun perolehan</label>
-              <input id="pc-tahun" type="number" min="1980" max="2100" placeholder="2026">
-            </div>
+          <div class="field" style="max-width:340px;">
+            <label for="pc-kib">Kategori KIB</label>
+            <select id="pc-kib" onchange="handleKategoriKibChange(this.value)">
+              <option value="A" ${kib==='A'?'selected':''}>KIB A — Tanah</option>
+              <option value="B" ${kib==='B'?'selected':''}>KIB B — Peralatan dan Mesin</option>
+              <option value="C" ${kib==='C'?'selected':''}>KIB C — Gedung dan Bangunan</option>
+              <option value="D" ${kib==='D'?'selected':''}>KIB D — Jalan, Irigasi, dan Jaringan</option>
+            </select>
           </div>
-          <div class="field">
-            <label for="pc-nama">Nama aset</label>
-            <input id="pc-nama" type="text" placeholder="mis. Printer Canon PIXMA G3010">
+          <div class="grid-auto">
+            ${dynamicFields.map(f => `
+              <div class="field">
+                <label for="pc-${f.key}">${f.header}${f.required?' *':''}</label>
+                <input id="pc-${f.key}" type="${f.type==='number'?'number':(f.type==='date'?'date':'text')}" ${f.type==='number'?'min="0"':''} placeholder="${f.header}">
+              </div>
+            `).join('')}
           </div>
-          <div class="grid-2">
-            <div class="field">
-              <label for="pc-nilai">Nilai perolehan (Rp)</label>
-              <input id="pc-nilai" type="number" min="0" placeholder="mis. 2500000">
-            </div>
-            <div class="field">
-              <label for="pc-lokasi">Lokasi awal</label>
-              <input id="pc-lokasi" type="text" placeholder="mis. Sekretariat">
-            </div>
-          </div>
-          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan aset</button></div>
+          <div class="form-actions" style="margin-top:14px;"><button type="submit" class="btn btn-primary">Simpan aset</button></div>
         </form>
       </div>
     </div>
@@ -1206,7 +1295,7 @@ function renderPencatatanTable(){
       <div class="panel-head"><div><h2>Daftar aset (BMD)</h2><div class="desc">${rows.length} aset tercatat</div></div></div>
       <div class="panel-body" style="padding:0;">
         <table>
-          <thead><tr><th>Kode</th><th>Nama aset</th><th>Kategori</th><th>Lokasi</th><th>Kondisi</th><th>Ketersediaan</th><th>Verifikasi</th><th></th></tr></thead>
+          <thead><tr><th>Kode</th><th>Nama aset</th><th>Kategori KIB</th><th>Lokasi</th><th>Kondisi</th><th>Ketersediaan</th><th>Verifikasi</th><th></th></tr></thead>
           <tbody>
             ${rows.length ? rows.map(a=>`
               <tr>
@@ -1218,6 +1307,7 @@ function renderPencatatanTable(){
                 <td>${statusBadge(a.statusKetersediaan)}</td>
                 <td>${statusBadge(a.statusVerifikasi)}</td>
                 <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="openAssetDetail('${a.id}')">Detail</button>
                   <button class="btn btn-ghost btn-sm" onclick="handlePrintLabel('${a.id}')">Cetak label</button>
                   <button class="btn btn-ghost btn-sm" onclick="handleHapusAset('${a.id}')">Hapus</button>
                 </td>
@@ -1228,31 +1318,111 @@ function renderPencatatanTable(){
     </div>
   `;
 }
+function handleKategoriKibChange(val){
+  state.pencatatanKategori = val;
+  renderApp();
+}
+function handleDownloadTemplate(){
+  const headers = [KIB_HEADER.header, ...FIELD_DEFS.map(f=>f.header)];
+  const exampleRecords = [
+    { kib:'A', nama:'Tanah Bangunan Kantor Pemerintah', kodeBarang:'10.131010104001', nibar:'10.131010104001.1981.000001', nomorRegister:'000001', luas:'1500', lokasi:'Jl. Pangeran Kornel No. 241 Sumedang', buktiKepemilikanNama:'Sertifikat', buktiKepemilikanNomor:'15', buktiKepemilikanTanggal:'1983-05-25', namaKepemilikanDokumen:'Dinas Tenaga Kerja dan Transmigrasi', jumlah:'1', satuan:'Bidang', hargaSatuan:'123000000', nilai:'123000000', caraPerolehan:'Pembelian', tanggalPerolehan:'1981-12-31', statusPenggunaan:'Dinas Tenaga Kerja dan Transmigrasi', keterangan:'Contoh data - hapus baris ini' },
+    { kib:'B', nama:'Mini Bus (Penumpang 14 Orang Kebawah)', kodeBarang:'10.132020102003', nibar:'10.132020102003.2014.000008', nomorRegister:'8', merekTipe:'Toyota Avanza', nomorPolisi:'Z 1045 A', nomorRangka:'MHFM1BA2JK007575', nomorBpkb:'-', lokasi:'Garasi Kantor', jumlah:'1', satuan:'Unit', hargaSatuan:'140214550', nilai:'140214550', caraPerolehan:'Pembelian', tanggalPerolehan:'2014-12-31', statusPenggunaan:'Operasional', keterangan:'Contoh data - hapus baris ini' },
+    { kib:'C', nama:'Bangunan Gedung Kantor Permanen', kodeBarang:'10.133010101001', nibar:'10.133010101001.2014.000002', nomorRegister:'000002', jumlahLantai:'2', luas:'664', lokasi:'Jl. Pangeran Kornel No. 241 Sumedang', statusKepemilikanTanah:'Milik Sendiri', jumlah:'1', satuan:'Unit', hargaSatuan:'950423649', nilai:'950423649', caraPerolehan:'Pembelian', tanggalPerolehan:'2014-12-31', statusPenggunaan:'Dinas Tenaga Kerja dan Transmigrasi', keterangan:'Contoh data - hapus baris ini' },
+    { kib:'D', nama:'Jaringan Listrik Lainnya', kodeBarang:'10.134040203001', nibar:'10.134040203001.2021.000001', nomorRegister:'000001', noRuas:'-', lokasi:'Kantor Disnakertrans', statusKepemilikanTanah:'Milik Sendiri', jumlah:'1', satuan:'Paket', hargaSatuan:'15000000', nilai:'15000000', caraPerolehan:'Pengadaan', tanggalPerolehan:'2021-11-14', statusPenggunaan:'Dinas Tenaga Kerja dan Transmigrasi', keterangan:'Contoh data - hapus baris ini' }
+  ];
+  const keys = [KIB_HEADER.key, ...FIELD_DEFS.map(f=>f.key)];
+  const rows = exampleRecords.map(r => keys.map(k => r[k] !== undefined ? r[k] : ''));
+  const sheetData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  ws['!cols'] = headers.map(()=>({wch:24}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Aset');
+  XLSX.writeFile(wb, 'Template_Import_Aset_SIMPATI.xlsx');
+}
+function handleExcelFileChange(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      let imported = 0, renamed = 0, skipped = 0;
+      rows.forEach(row => {
+        const draft = {};
+        Object.keys(row).forEach(ownHeader => {
+          const norm = normalizeHeader(ownHeader);
+          const key = HEADER_KEY_MAP[norm];
+          if(key) draft[key] = String(row[ownHeader]).trim();
+        });
+        FIELD_DEFS.forEach(f => { if(draft[f.key]===undefined) draft[f.key] = ''; });
+        if(!draft.nama){ skipped++; return; }
+        const kib = normalizeKib(draft.kib);
+        let kode = draft.kodeBarang || draft.nibar || uid('BMD');
+        if(state.data.assets.some(a=>a.kode.toLowerCase()===kode.toLowerCase())){
+          kode = kode + '-' + uid('X').slice(-4);
+          renamed++;
+        }
+        const tahun = draft.tanggalPerolehan ? String(draft.tanggalPerolehan).slice(0,4) : '';
+        const asset = Object.assign({
+          id: uid('AST'), kib, kode, kategori: KIB_CATEGORIES[kib],
+          kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
+          dibuat: todayISO(), tahun
+        }, draft, { kode });
+        state.data.assets.push(asset);
+        imported++;
+      });
+      if(imported > 0){ await saveCollection('assets'); }
+      state.formError.importExcel = null;
+      let msg = imported + ' aset berhasil diimpor.';
+      if(renamed>0) msg += ' ' + renamed + ' kode diubah otomatis karena duplikat.';
+      if(skipped>0) msg += ' ' + skipped + ' baris dilewati karena kolom Nama Barang kosong.';
+      state.formSuccess.importExcel = msg;
+    }catch(err){
+      console.error(err);
+      state.formSuccess.importExcel = null;
+      state.formError.importExcel = 'Gagal membaca berkas Excel. Pastikan formatnya sesuai template lalu coba lagi.';
+    }
+    ev.target.value = '';
+    renderApp();
+  };
+  reader.onerror = function(){
+    state.formError.importExcel = 'Gagal membaca berkas. Coba unggah ulang.';
+    renderApp();
+  };
+  reader.readAsArrayBuffer(file);
+}
 async function handlePencatatanSubmit(ev){
   ev.preventDefault();
-  const kode = document.getElementById('pc-kode').value.trim();
-  const nama = document.getElementById('pc-nama').value.trim();
-  const kategori = document.getElementById('pc-kategori').value;
-  const tahun = document.getElementById('pc-tahun').value.trim();
-  const nilai = document.getElementById('pc-nilai').value.trim();
-  const lokasi = document.getElementById('pc-lokasi').value.trim();
+  const kib = state.pencatatanKategori;
+  const applicable = FIELD_DEFS.filter(f => fieldAppliesTo(f, kib));
+  const draft = {};
+  applicable.forEach(f => {
+    const el = document.getElementById('pc-'+f.key);
+    draft[f.key] = el ? el.value.trim() : '';
+  });
+  FIELD_DEFS.forEach(f => { if(!(f.key in draft)) draft[f.key] = ''; });
 
-  if(!kode || !nama){
-    state.formError.pencatatan = 'Kode aset dan nama aset wajib diisi.';
+  if(!draft.nama){
+    state.formError.pencatatan = 'Nama Barang wajib diisi.';
     renderApp(); return false;
   }
+  const kode = draft.kodeBarang || draft.nibar || uid('BMD');
   if(state.data.assets.some(a=>a.kode.toLowerCase()===kode.toLowerCase())){
-    state.formError.pencatatan = `Kode aset "${escapeHtml(kode)}" sudah digunakan. Gunakan kode lain.`;
+    state.formError.pencatatan = 'Kode "' + escapeHtml(kode) + '" sudah digunakan. Isi Kode Barang atau NIBAR yang berbeda.';
     renderApp(); return false;
   }
-  const asset = {
-    id: uid('AST'), kode, nama, kategori, tahun, nilai, lokasi,
+  const tahun = draft.tanggalPerolehan ? draft.tanggalPerolehan.slice(0,4) : '';
+  const asset = Object.assign({
+    id: uid('AST'), kib, kode, kategori: KIB_CATEGORIES[kib],
     kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi',
-    dibuat: todayISO()
-  };
+    dibuat: todayISO(), tahun
+  }, draft, { kode });
   state.data.assets.push(asset);
   state.formError.pencatatan = null;
-  state.formSuccess.pencatatan = `Aset ${escapeHtml(kode)} berhasil disimpan ke basis data.`;
+  state.formSuccess.pencatatan = 'Aset "' + escapeHtml(draft.nama) + '" (' + escapeHtml(kode) + ') berhasil disimpan ke basis data.';
   await saveCollection('assets');
   renderApp();
   return false;
@@ -1266,6 +1436,58 @@ async function handleHapusAset(id){
   state.data.identifikasi = state.data.identifikasi.filter(r=>r.assetId!==id);
   await Promise.all(['assets','verifikasi','peminjaman','pemeliharaan','identifikasi'].map(saveCollection));
   renderApp();
+}
+function openAssetDetail(id){
+  const a = getAsset(id);
+  if(!a) return;
+  const area = document.getElementById('detail-modal-area');
+  const rows = [
+    ['Kategori KIB', a.kib ? ('KIB ' + a.kib + ' — ' + (KIB_CATEGORIES[a.kib]||'')) : (a.kategori||'')],
+    ['Kode Barang', a.kodeBarang||''],
+    ['NIBAR', a.nibar||''],
+    ['Nomor Register', a.nomorRegister||''],
+    ['Spesifikasi Nama Barang', a.spesifikasi||''],
+    ['Spesifikasi Lainnya', a.spesifikasiLainnya||''],
+    ['Merek/Tipe', a.merekTipe||''],
+    ['Jumlah Lantai', a.jumlahLantai||''],
+    ['No. Ruas Jalan/Jembatan/Jaringan Irigasi', a.noRuas||''],
+    ['Luas', a.luas||''],
+    ['Titik Koordinat', a.titikKoordinat||''],
+    ['Status Kepemilikan Tanah', a.statusKepemilikanTanah||''],
+    ['Nomor Polisi', a.nomorPolisi||''],
+    ['Nomor Rangka', a.nomorRangka||''],
+    ['Nomor BPKB', a.nomorBpkb||''],
+    ['Bukti Kepemilikan (Nama)', a.buktiKepemilikanNama||''],
+    ['Bukti Kepemilikan (Nomor)', a.buktiKepemilikanNomor||''],
+    ['Bukti Kepemilikan (Tanggal)', a.buktiKepemilikanTanggal ? fmtDate(a.buktiKepemilikanTanggal) : ''],
+    ['Nama Kepemilikan Dalam Dokumen', a.namaKepemilikanDokumen||''],
+    ['Jumlah', a.jumlah||''],
+    ['Satuan', a.satuan||''],
+    ['Harga Satuan Perolehan (Rp)', a.hargaSatuan||''],
+    ['Nilai Perolehan (Rp)', a.nilai||''],
+    ['Cara Perolehan', a.caraPerolehan||''],
+    ['Tanggal Perolehan', a.tanggalPerolehan ? fmtDate(a.tanggalPerolehan) : ''],
+    ['Status Penggunaan', a.statusPenggunaan||''],
+    ['Keterangan', a.keterangan||'']
+  ].filter(r => r[1]);
+  area.innerHTML = `
+    <div class="modal-overlay" onclick="closeAssetDetail()">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <h3>${escapeHtml(a.nama)}</h3>
+          <button class="btn btn-ghost btn-sm" onclick="closeAssetDetail()">Tutup</button>
+        </div>
+        <div class="modal-body">
+          <table class="detail-table">
+            ${rows.length ? rows.map(r=>'<tr><td>'+escapeHtml(r[0])+'</td><td>'+escapeHtml(r[1])+'</td></tr>').join('') : '<tr><td colspan="2">Tidak ada data tambahan untuk aset ini.</td></tr>'}
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function closeAssetDetail(){
+  document.getElementById('detail-modal-area').innerHTML = '';
 }
 
 /* ================= LOGO & CETAK LABEL ================= */
