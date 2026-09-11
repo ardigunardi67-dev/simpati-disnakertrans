@@ -423,7 +423,7 @@
   ::placeholder{ color:#A7A296; }
 
   @media print{
-    .sidebar, .topbar .btn, #print-hide{ display:none !important; }
+    .sidebar, .topbar .btn, .print-hide{ display:none !important; }
     body{ background:#fff; }
     .content{ padding:0; max-width:100%; }
     .panel{ border:none; box-shadow:none; }
@@ -606,9 +606,10 @@ const ROLE_LABELS = {
 const ROLE_MENUS = {
   pengurus_barang: ['beranda', 'pencatatan', 'identifikasi', 'penggunaan', 'pemeliharaan', 'laporan'],
   verifikator: ['beranda', 'verifikasi', 'laporan'],
-  admin: ['beranda', 'kelola_pengguna', 'laporan']
+  admin: ['beranda', 'pencatatan', 'identifikasi', 'penggunaan', 'pemeliharaan', 'verifikasi', 'kelola_pengguna', 'laporan']
 };
 function roleCanAccess(role, view){
+  if(role==='admin') return true;
   if(view==='beranda' || view==='laporan') return true;
   return (ROLE_MENUS[role] || []).includes(view);
 }
@@ -2550,6 +2551,91 @@ async function handleHapusPengguna(id){
 }
 
 /* ================= RENDER: LAPORAN ================= */
+function handlePrintLaporanKIB(kibFilter){
+  const assetsToPrint = kibFilter==='ALL' ? state.data.assets : state.data.assets.filter(a=>a.kib===kibFilter);
+  const dynamicDefs = (kibFilter==='ALL' ? FIELD_DEFS : FIELD_DEFS.filter(f=>fieldAppliesTo(f, kibFilter)))
+    .filter(f => f.key!=='nama' && f.key!=='kodeBarang');
+
+  const headers = ['No', 'Kode Barang', 'Nama Barang', ...dynamicDefs.map(d=>d.header), 'Kondisi', 'Ketersediaan', 'Verifikasi'];
+
+  const rows = assetsToPrint.map((a,i) => {
+    const cells = [
+      i+1,
+      a.kode || '-',
+      a.nama || '-',
+      ...dynamicDefs.map(d => {
+        const v = a[d.key];
+        if(!v) return '-';
+        return d.type==='date' ? fmtDate(v) : v;
+      }),
+      a.kondisi || '-',
+      a.statusKetersediaan || '-',
+      a.statusVerifikasi || '-'
+    ];
+    return cells;
+  });
+
+  const title = kibFilter==='ALL'
+    ? 'DAFTAR SELURUH BARANG MILIK DAERAH'
+    : 'DAFTAR BARANG MILIK DAERAH — KARTU INVENTARIS BARANG (KIB) ' + kibFilter + ' (' + (KIB_CATEGORIES[kibFilter]||'').toUpperCase() + ')';
+
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  if(!win){ alert('Popup diblokir oleh browser. Izinkan popup untuk mencetak laporan.'); return; }
+
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page{ size: A4 landscape; margin: 1.4cm; }
+    body{ font-family: Arial, Helvetica, sans-serif; color:#111; font-size:9pt; }
+    .doc-header{ text-align:center; margin-bottom:4px; }
+    .doc-header img{ height:52px; margin-bottom:4px; }
+    .doc-header h1,.doc-header h2{ margin:1px 0; font-size:11pt; }
+    .doc-header h3{ font-size:11.5pt; text-decoration:underline; margin-top:8px; }
+    hr{ border:none; border-top:2px solid #111; margin:8px 0 4px; }
+    .meta-row{ display:flex; justify-content:space-between; font-size:8.5pt; margin-bottom:8px; }
+    table.excel{ width:100%; border-collapse:collapse; table-layout:auto; }
+    table.excel th, table.excel td{ border:1px solid #444; padding:3px 5px; text-align:left; vertical-align:top; white-space:nowrap; }
+    table.excel th{ background:#E7ECEF; font-weight:700; text-align:center; }
+    table.excel td.num{ text-align:center; }
+    .sign{ margin-top:36px; width:100%; }
+    .sign td{ width:50%; text-align:center; vertical-align:top; font-size:9pt; }
+    .sign .space{ height:60px; }
+    @media print{ .no-print{ display:none; } }
+  </style>
+  </head><body>
+    <div class="doc-header">
+      <img src="${SUMEDANG_LOGO_DATA_URL}" alt="Logo Kabupaten Sumedang">
+      <h1>PEMERINTAH KABUPATEN SUMEDANG</h1>
+      <h2>DINAS TENAGA KERJA DAN TRANSMIGRASI</h2>
+      <h3>${escapeHtml(title)}</h3>
+    </div>
+    <hr>
+    <div class="meta-row">
+      <span>Jumlah data: ${rows.length} aset</span>
+      <span>Dicetak pada: ${fmtDate(todayISO())}</span>
+    </div>
+    <table class="excel">
+      <thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(r=>`<tr>${r.map((c,idx)=>`<td class="${idx===0?'num':''}">${escapeHtml(c)}</td>`).join('')}</tr>`).join('')
+          : `<tr><td colspan="${headers.length}" style="text-align:center;">Tidak ada data aset untuk kategori ini.</td></tr>`}
+      </tbody>
+    </table>
+    <table class="sign">
+      <tr><td>Mengetahui,<br>Kepala Dinas Tenaga Kerja dan Transmigrasi</td><td>Sumedang, ${fmtDate(todayISO())}<br>Pengurus Barang</td></tr>
+      <tr><td class="space"></td><td class="space"></td></tr>
+      <tr><td>(_______________________)<br>NIP. .........................................</td><td>(_______________________)<br>NIP. .........................................</td></tr>
+    </table>
+    <div class="no-print" style="margin-top:30px;text-align:center;">
+      <button onclick="window.print()" style="padding:8px 16px;">Cetak</button>
+    </div>
+  </body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.onload = function(){ win.focus(); win.print(); };
+}
+
 function renderLaporan(){
   const a = state.data.assets;
   const total = a.length;
@@ -2559,8 +2645,18 @@ function renderLaporan(){
   const terverifikasi = a.filter(x=>x.statusVerifikasi==='Terverifikasi').length;
 
   return `
-    <div id="print-hide" style="margin-bottom:16px;">
-      <button class="btn btn-ghost btn-sm" onclick="window.print()">Cetak laporan</button>
+    <div class="print-hide panel">
+      <div class="panel-head"><div><h2>Cetak Laporan Resmi</h2><div class="desc">Format tabel dengan kop dinas, sesuai kategori KIB atau seluruh aset</div></div></div>
+      <div class="panel-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="handlePrintLaporanKIB('ALL')">Cetak Semua Aset</button>
+        <button class="btn btn-ghost btn-sm" onclick="handlePrintLaporanKIB('A')">Cetak KIB A — Tanah</button>
+        <button class="btn btn-ghost btn-sm" onclick="handlePrintLaporanKIB('B')">Cetak KIB B — Peralatan &amp; Mesin</button>
+        <button class="btn btn-ghost btn-sm" onclick="handlePrintLaporanKIB('C')">Cetak KIB C — Gedung &amp; Bangunan</button>
+        <button class="btn btn-ghost btn-sm" onclick="handlePrintLaporanKIB('D')">Cetak KIB D — Jalan, Irigasi &amp; Jaringan</button>
+      </div>
+    </div>
+    <div class="print-hide" style="margin-bottom:16px;">
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">Cetak halaman ini</button>
     </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset</div></div>
