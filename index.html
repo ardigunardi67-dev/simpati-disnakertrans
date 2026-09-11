@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
     --navy-900:#0F3550;
@@ -681,18 +682,37 @@ function normalizeKib(v){
   return 'B';
 }
 
-/* ---------------- STORAGE ---------------- */
 /* ---------------- PENYIMPANAN ----------------
-   window.storage hanya tersedia di dalam Claude. Saat situs ini dijalankan
-   sebagai halaman biasa (mis. di Netlify), kita pakai localStorage milik
-   browser supaya data tetap tersimpan setelah halaman dimuat ulang.
-   Catatan: localStorage bersifat per-perangkat/per-browser, bukan dibagikan
-   antar pengguna seperti window.storage di dalam Claude. */
+   Prioritas: 1) Supabase (jika sudah dikonfigurasi di bawah) — data
+   tersimpan di server, dibagikan ke semua pengguna dari mana saja.
+   2) window.storage — hanya tersedia di dalam Claude.
+   3) localStorage milik browser — cadangan terakhir, tersimpan per
+   perangkat/browser saja, tidak dibagikan antar pengguna. */
+
+/* GANTI DUA NILAI DI BAWAH INI dengan Project URL dan anon public key
+   dari Supabase Anda (Project Settings > Data API). Selama masih berisi
+   teks placeholder ini, aplikasi otomatis memakai localStorage. */
+const SUPABASE_URL = 'https://rjbvhezqimuuplbvftiz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_r_KZ1Imlt_GLd7t05DT_qg_1OOins_y';
+
+const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('GANTI_DENGAN') && !SUPABASE_ANON_KEY.includes('GANTI_DENGAN');
+const supabaseClient = (SUPABASE_CONFIGURED && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
 const HAS_CLAUDE_STORAGE = (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function');
 const LOCAL_PREFIX = 'simpati:';
+const STORAGE_MODE = supabaseClient ? 'supabase' : (HAS_CLAUDE_STORAGE ? 'claude' : 'local');
 
 async function storageGetRaw(key){
-  if(HAS_CLAUDE_STORAGE){
+  if(STORAGE_MODE === 'supabase'){
+    try{
+      const { data, error } = await supabaseClient.from('simpati_kv').select('value').eq('key', key).maybeSingle();
+      if(error) throw error;
+      return data ? JSON.stringify(data.value) : null;
+    }catch(e){ console.error('Gagal membaca dari Supabase ('+key+')', e); return null; }
+  }
+  if(STORAGE_MODE === 'claude'){
     try{
       const res = await window.storage.get(key, true);
       return (res && res.value) ? res.value : null;
@@ -701,7 +721,14 @@ async function storageGetRaw(key){
   try{ return localStorage.getItem(LOCAL_PREFIX + key); }catch(e){ return null; }
 }
 async function storageSetRaw(key, value){
-  if(HAS_CLAUDE_STORAGE){
+  if(STORAGE_MODE === 'supabase'){
+    try{
+      const { error } = await supabaseClient.from('simpati_kv').upsert({ key, value: JSON.parse(value), updated_at: new Date().toISOString() });
+      if(error) throw error;
+      return true;
+    }catch(e){ console.error('Gagal menyimpan ke Supabase ('+key+')', e); return false; }
+  }
+  if(STORAGE_MODE === 'claude'){
     try{ await window.storage.set(key, value, true); return true; }catch(e){ console.error('Gagal menyimpan (Claude storage)', e); return false; }
   }
   try{ localStorage.setItem(LOCAL_PREFIX + key, value); return true; }catch(e){ console.error('Gagal menyimpan (localStorage)', e); return false; }
@@ -836,6 +863,13 @@ function renderBeranda(){
     .slice(0,8);
 
   return `
+    <div class="alert ${STORAGE_MODE==='supabase' ? 'alert-good' : 'alert-warn'}" style="margin-bottom:18px;">
+      ${STORAGE_MODE==='supabase'
+        ? '<b>Basis data:</b> Terhubung ke Supabase — data tersimpan di server dan sama untuk semua pengguna.'
+        : STORAGE_MODE==='claude'
+          ? '<b>Basis data:</b> Penyimpanan Claude (mode pratinjau) — hubungkan Supabase agar data tersimpan permanen di server.'
+          : '<b>Basis data:</b> Penyimpanan lokal browser ini saja (Supabase belum dikonfigurasi) — data tidak dibagikan ke perangkat/pengguna lain.'}
+    </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset tercatat</div></div>
       <div class="stat-card c-good"><div class="num">${tersedia}</div><div class="lbl">Tersedia</div></div>
