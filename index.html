@@ -600,6 +600,9 @@ const state = {
   excelImportStaged: null,
   identifikasiPreselectId: null,
   identifikasiFilterKategori: 'ALL',
+  editingPemeliharaanId: null,
+  pemeliharaanFilterJenis: 'ALL',
+  pemeliharaanFilterTahun: 'ALL',
   data: { assets: [], verifikasi: [], penggunaan: [], pemeliharaan: [], identifikasi: [] },
   formError: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
   formSuccess: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
@@ -823,6 +826,7 @@ function goTo(view){
   state.editingAssetId = null;
   state.excelImportStaged = null;
   state.identifikasiPreselectId = null;
+  state.editingPemeliharaanId = null;
   Object.keys(state.formError).forEach(k=>state.formError[k]=null);
   Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
   renderApp();
@@ -1198,17 +1202,19 @@ function handlePrintBAST(recordId){
 }
 
 /* ================= RENDER: PEMELIHARAAN ================= */
+const JENIS_PEMELIHARAAN = ['Rutin/Berkala', 'Perbaikan/Perawatan Insidentil', 'Kalibrasi'];
 function renderPemeliharaan(){
   const err = state.formError.pemeliharaan;
   const ok = state.formSuccess.pemeliharaan;
+  const editing = state.editingPemeliharaanId ? state.data.pemeliharaan.find(r=>r.id===state.editingPemeliharaanId) : null;
   return `
     <div class="flow-steps">
       <span class="flow-step"><b>1</b>Input aset yang perlu pemeliharaan</span>
-      <span class="flow-step"><b>2</b>Catat jadwal / perbaikan</span>
-      <span class="flow-step"><b>3</b>Perbarui riwayat &amp; simpan</span>
+      <span class="flow-step"><b>2</b>Catat pelaksanaan, biaya &amp; kondisi</span>
+      <span class="flow-step"><b>3</b>Simpan &amp; jadwalkan pemeliharaan berikutnya</span>
     </div>
-    <div class="panel">
-      <div class="panel-head"><div><h2>Formulir pemeliharaan</h2><div class="desc">Aset yang sedang digunakan tidak dapat dijadwalkan pemeliharaan</div></div></div>
+    <div class="panel" id="form-pemeliharaan-panel">
+      <div class="panel-head"><div><h2>${editing ? 'Edit riwayat pemeliharaan' : 'Formulir pemeliharaan aset'}</h2><div class="desc">Aset yang sedang digunakan tidak dapat dijadwalkan pemeliharaan</div></div></div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
@@ -1216,74 +1222,234 @@ function renderPemeliharaan(){
         <form onsubmit="return handlePemeliharaanSubmit(event)">
           <div class="grid-2">
             <div class="field">
-              <label for="pm-asset">Aset</label>
-              <select id="pm-asset">${assetOptions()}</select>
+              <label for="pm-asset">Kode/No. Register Aset</label>
+              <select id="pm-asset" ${editing?'disabled':''}>${assetOptions(editing?editing.assetId:undefined)}</select>
             </div>
             <div class="field">
-              <label for="pm-jenis">Jenis pemeliharaan</label>
+              <label for="pm-jenis">Jenis Pemeliharaan</label>
               <select id="pm-jenis">
-                <option value="Rutin">Rutin</option>
-                <option value="Perbaikan">Perbaikan</option>
+                ${JENIS_PEMELIHARAAN.map(j=>`<option value="${j}" ${editing&&editing.jenis===j?'selected':''}>${j}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pm-tanggal">Tanggal Pelaksanaan</label>
+              <input id="pm-tanggal" type="date" value="${editing?editing.tanggalPelaksanaan:todayISO()}">
+            </div>
+            <div class="field">
+              <label for="pm-pelaksana">Pelaksana/Vendor</label>
+              <input id="pm-pelaksana" type="text" value="${editing?escapeHtml(editing.pelaksana||''):''}" placeholder="mis. CV Mitra Komputer / Teknisi Internal">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pm-biaya">Biaya Pemeliharaan (Rp)</label>
+              <input id="pm-biaya" type="number" min="0" value="${editing?editing.biaya:''}" placeholder="mis. 450000">
+            </div>
+            <div class="field">
+              <label for="pm-status">Status Pekerjaan</label>
+              <select id="pm-status">
+                <option value="Selesai" ${!editing||editing.status==='Selesai'?'selected':''}>Selesai</option>
+                <option value="Berjalan" ${editing&&editing.status==='Berjalan'?'selected':''}>Berjalan</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pm-kondisi-sebelum">Kondisi Sebelum</label>
+              <select id="pm-kondisi-sebelum">
+                <option value="Baik" ${editing&&editing.kondisiSebelum==='Baik'?'selected':''}>Baik</option>
+                <option value="Rusak Ringan" ${editing&&editing.kondisiSebelum==='Rusak Ringan'?'selected':''}>Rusak Ringan</option>
+                <option value="Rusak Berat" ${editing&&editing.kondisiSebelum==='Rusak Berat'?'selected':''}>Rusak Berat</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pm-kondisi-sesudah">Kondisi Sesudah</label>
+              <select id="pm-kondisi-sesudah">
+                <option value="Baik" ${!editing||editing.kondisiSesudah==='Baik'?'selected':''}>Baik</option>
+                <option value="Rusak Ringan" ${editing&&editing.kondisiSesudah==='Rusak Ringan'?'selected':''}>Rusak Ringan</option>
+                <option value="Rusak Berat" ${editing&&editing.kondisiSesudah==='Rusak Berat'?'selected':''}>Rusak Berat</option>
               </select>
             </div>
           </div>
           <div class="field">
-            <label for="pm-jadwal">Tanggal jadwal / pelaksanaan</label>
-            <input id="pm-jadwal" type="date" value="${todayISO()}">
+            <label for="pm-keterangan">Keterangan/Deskripsi Pekerjaan</label>
+            <textarea id="pm-keterangan" rows="2" placeholder="mis. servis rutin AC, ganti sparepart...">${editing?escapeHtml(editing.keterangan||''):''}</textarea>
           </div>
           <div class="field">
-            <label for="pm-catatan">Catatan kerusakan / tindakan</label>
-            <textarea id="pm-catatan" rows="2" placeholder="mis. servis rutin AC, ganti sparepart..."></textarea>
+            <label>Upload Bukti (nota, foto, dokumen kontrak)</label><br>
+            <button type="button" class="btn btn-ghost" onclick="alert('Fitur unggah bukti akan tersedia pada pembaruan berikutnya.')">Unggah Bukti</button>
+            <div class="hint-text">Tombol tersedia sebagai penanda tempat — penyimpanan berkas akan diaktifkan pada tahap pengembangan berikutnya.</div>
           </div>
-          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan pemeliharaan</button></div>
+          <div class="panel" style="margin:16px 0 0;border-style:dashed;">
+            <div class="panel-body" style="padding:14px 16px;">
+              <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:8px;">Jadwal Pemeliharaan Berikutnya (opsional)</label>
+              <div class="grid-2">
+                <div class="field">
+                  <label for="pm-next-jenis">Jenis Pemeliharaan Berikutnya</label>
+                  <select id="pm-next-jenis">
+                    <option value="">— Tidak dijadwalkan —</option>
+                    ${JENIS_PEMELIHARAAN.map(j=>`<option value="${j}" ${editing&&editing.nextJenis===j?'selected':''}>${j}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="pm-next-tanggal">Estimasi Tanggal</label>
+                  <input id="pm-next-tanggal" type="date" value="${editing?(editing.nextTanggal||''):''}">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top:14px;">
+            <button type="submit" class="btn btn-primary">${editing?'Simpan perubahan':'Simpan pemeliharaan'}</button>
+            ${editing ? `<button type="button" class="btn btn-ghost" onclick="handleCancelEditPemeliharaan()">Batal edit</button>` : ''}
+          </div>
         </form>`}
       </div>
     </div>
     ${renderPemeliharaanTable()}
+    ${renderJadwalPemeliharaan()}
   `;
 }
 function renderPemeliharaanTable(){
-  const rows = [...state.data.pemeliharaan].sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+  const jenisFilter = state.pemeliharaanFilterJenis;
+  const tahunFilter = state.pemeliharaanFilterTahun;
+  const tahunOptions = [...new Set(state.data.pemeliharaan.map(r=>(r.tanggalPelaksanaan||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  let rows = [...state.data.pemeliharaan].sort((a,b)=>(b.tanggalPelaksanaan||'').localeCompare(a.tanggalPelaksanaan||''));
+  if(jenisFilter!=='ALL') rows = rows.filter(r=>r.jenis===jenisFilter);
+  if(tahunFilter!=='ALL') rows = rows.filter(r=>(r.tanggalPelaksanaan||'').slice(0,4)===tahunFilter);
   return `
     <div class="panel">
-      <div class="panel-head"><div><h2>Riwayat pemeliharaan</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-head">
+        <div><h2>Output Tabel Riwayat Pemeliharaan</h2><div class="desc">${rows.length} dari ${state.data.pemeliharaan.length} catatan</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select onchange="handlePemeliharaanFilterJenis(this.value)" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius);font-size:13px;">
+            <option value="ALL" ${jenisFilter==='ALL'?'selected':''}>Semua Jenis</option>
+            ${JENIS_PEMELIHARAAN.map(j=>`<option value="${j}" ${jenisFilter===j?'selected':''}>${j}</option>`).join('')}
+          </select>
+          <select onchange="handlePemeliharaanFilterTahun(this.value)" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius);font-size:13px;">
+            <option value="ALL" ${tahunFilter==='ALL'?'selected':''}>Semua Tahun</option>
+            ${tahunOptions.map(t=>`<option value="${t}" ${tahunFilter===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div class="panel-body" style="padding:0;">
         <table>
-          <thead><tr><th>Tanggal</th><th>Aset</th><th>Jenis</th><th>Catatan</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>No</th><th>Kode Aset</th><th>Nama Aset</th><th>Jenis Pemeliharaan</th><th>Tgl Pelaksanaan</th><th>Pelaksana</th><th>Biaya</th><th>Kondisi Sesudah</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            ${rows.length ? rows.map(r=>`
+            ${rows.length ? rows.map((r,i)=>{ const a=getAsset(r.assetId); return `
               <tr>
-                <td>${fmtDate(r.tanggal)}</td>
+                <td>${i+1}</td>
+                <td class="mono">${a?escapeHtml(a.kode):'—'}</td>
                 <td>${assetLabel(r.assetId)}</td>
                 <td>${escapeHtml(r.jenis)}</td>
-                <td>${escapeHtml(r.catatan||'—')}</td>
+                <td>${fmtDate(r.tanggalPelaksanaan)}</td>
+                <td>${escapeHtml(r.pelaksana||'—')}</td>
+                <td>${r.biaya?('Rp ' + Number(r.biaya).toLocaleString('id-ID')):'—'}</td>
+                <td>${statusBadge(r.kondisiSesudah||'—')}</td>
                 <td>${statusBadge(r.status)}</td>
-                <td>${r.status==='Berjalan' ? `<button class="btn btn-ghost btn-sm" onclick="handleSelesaiPemeliharaan('${r.id}')">Tandai selesai</button>` : ''}</td>
-              </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Belum ada riwayat pemeliharaan.</td></tr>'}
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="handlePrintBAPemeliharaan('${r.id}')">Cetak Bukti</button>
+                  <button class="btn btn-ghost btn-sm" onclick="handleEditPemeliharaan('${r.id}')">Edit</button>
+                  ${r.status==='Berjalan' ? `<button class="btn btn-ghost btn-sm" onclick="handleSelesaiPemeliharaan('${r.id}')">Tandai selesai</button>` : ''}
+                </td>
+              </tr>`; }).join('') : '<tr class="empty-row"><td colspan="10">Belum ada riwayat pemeliharaan.</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>
   `;
 }
+function renderJadwalPemeliharaan(){
+  const today = todayISO();
+  const scheduled = state.data.pemeliharaan
+    .filter(r => r.nextTanggal)
+    .sort((a,b)=>a.nextTanggal.localeCompare(b.nextTanggal));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Jadwal Pemeliharaan (Kalender/Reminder)</h2><div class="desc">Pemeliharaan mendatang yang telah dijadwalkan</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Kode Aset</th><th>Nama Aset</th><th>Jenis Pemeliharaan Berikutnya</th><th>Estimasi Tanggal</th><th>Status</th></tr></thead>
+          <tbody>
+            ${scheduled.length ? scheduled.map(r=>{
+              const a = getAsset(r.assetId);
+              const overdue = r.nextTanggal < today;
+              const soon = !overdue && r.nextTanggal <= new Date(Date.now()+14*86400000).toISOString().slice(0,10);
+              const label = overdue ? 'Lewat Jadwal' : (soon ? 'Segera' : 'Terjadwal');
+              const cls = overdue ? 'badge-bad' : (soon ? 'badge-warn' : 'badge-neutral');
+              return `
+              <tr>
+                <td class="mono">${a?escapeHtml(a.kode):'—'}</td>
+                <td>${assetLabel(r.assetId)}</td>
+                <td>${escapeHtml(r.nextJenis||'—')}</td>
+                <td>${fmtDate(r.nextTanggal)}</td>
+                <td><span class="badge ${cls}">${label}</span></td>
+              </tr>`; }).join('') : '<tr class="empty-row"><td colspan="5">Belum ada jadwal pemeliharaan berikutnya.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function handlePemeliharaanFilterJenis(val){ state.pemeliharaanFilterJenis = val; renderApp(); }
+function handlePemeliharaanFilterTahun(val){ state.pemeliharaanFilterTahun = val; renderApp(); }
+function handleEditPemeliharaan(id){
+  state.editingPemeliharaanId = id;
+  renderApp();
+  const panel = document.getElementById('form-pemeliharaan-panel');
+  if(panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function handleCancelEditPemeliharaan(){
+  state.editingPemeliharaanId = null;
+  renderApp();
+}
 async function handlePemeliharaanSubmit(ev){
   ev.preventDefault();
+  const editingId = state.editingPemeliharaanId;
   const assetId = document.getElementById('pm-asset').value;
   const jenis = document.getElementById('pm-jenis').value;
-  const jadwal = document.getElementById('pm-jadwal').value || todayISO();
-  const catatan = document.getElementById('pm-catatan').value.trim();
+  const tanggalPelaksanaan = document.getElementById('pm-tanggal').value || todayISO();
+  const pelaksana = document.getElementById('pm-pelaksana').value.trim();
+  const biaya = document.getElementById('pm-biaya').value.trim();
+  const status = document.getElementById('pm-status').value;
+  const kondisiSebelum = document.getElementById('pm-kondisi-sebelum').value;
+  const kondisiSesudah = document.getElementById('pm-kondisi-sesudah').value;
+  const keterangan = document.getElementById('pm-keterangan').value.trim();
+  const nextJenis = document.getElementById('pm-next-jenis').value;
+  const nextTanggal = document.getElementById('pm-next-tanggal').value;
   const asset = getAsset(assetId);
 
-  if(asset && asset.statusKetersediaan === 'Digunakan'){
+  if(!editingId && asset && asset.statusKetersediaan === 'Digunakan'){
     state.formSuccess.pemeliharaan = null;
     state.formError.pemeliharaan = 'Aset sedang digunakan sehingga belum dapat dijadwalkan pemeliharaan. Hentikan penggunaannya terlebih dahulu.';
     renderApp(); return false;
   }
-  const record = { id: uid('PML'), assetId, jenis, jadwal, catatan, status:'Berjalan', tanggal: todayISO() };
-  state.data.pemeliharaan.push(record);
-  if(asset) asset.statusKetersediaan = 'Pemeliharaan';
-  state.formError.pemeliharaan = null;
-  state.formSuccess.pemeliharaan = 'Jadwal pemeliharaan tersimpan dan status aset diperbarui menjadi Pemeliharaan.';
+
+  if(editingId){
+    const existing = state.data.pemeliharaan.find(r=>r.id===editingId);
+    if(existing){
+      Object.assign(existing, { jenis, tanggalPelaksanaan, pelaksana, biaya, status, kondisiSebelum, kondisiSesudah, keterangan, nextJenis: nextJenis||null, nextTanggal: nextTanggal||null });
+    }
+    if(asset) asset.statusKetersediaan = status==='Berjalan' ? 'Pemeliharaan' : 'Tersedia';
+    if(asset && kondisiSesudah) asset.kondisi = kondisiSesudah;
+    state.editingPemeliharaanId = null;
+    state.formError.pemeliharaan = null;
+    state.formSuccess.pemeliharaan = 'Perubahan riwayat pemeliharaan berhasil disimpan.';
+  } else {
+    const record = {
+      id: uid('PML'), assetId, jenis, tanggalPelaksanaan, pelaksana, biaya, status,
+      kondisiSebelum, kondisiSesudah, keterangan, nextJenis: nextJenis||null, nextTanggal: nextTanggal||null,
+      nomorBA: 'BA-PML/' + Date.now().toString().slice(-6) + '/DTKT', tanggal: todayISO()
+    };
+    state.data.pemeliharaan.push(record);
+    if(asset){
+      asset.statusKetersediaan = status==='Berjalan' ? 'Pemeliharaan' : 'Tersedia';
+      if(kondisiSesudah) asset.kondisi = kondisiSesudah;
+    }
+    state.formError.pemeliharaan = null;
+    state.formSuccess.pemeliharaan = 'Riwayat pemeliharaan tersimpan.' + (status==='Berjalan' ? ' Status aset diperbarui menjadi Pemeliharaan.' : '');
+  }
   await saveCollection('pemeliharaan');
   await saveCollection('assets');
   renderApp();
@@ -1298,6 +1464,67 @@ async function handleSelesaiPemeliharaan(id){
   await saveCollection('pemeliharaan');
   await saveCollection('assets');
   renderApp();
+}
+function handlePrintBAPemeliharaan(recordId){
+  const r = state.data.pemeliharaan.find(x=>x.id===recordId);
+  if(!r) return;
+  const a = getAsset(r.assetId);
+  if(!a) return;
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ alert('Popup diblokir oleh browser. Izinkan popup untuk mencetak Berita Acara.'); return; }
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+  <title>BA Pemeliharaan - ${r.nomorBA}</title>
+  <style>
+    @page{ size: A4; margin: 2.2cm; }
+    body{ font-family: 'Times New Roman', serif; color:#111; font-size:13pt; line-height:1.5; }
+    .doc-header{ text-align:center; margin-bottom:6px; }
+    .doc-header img{ height:64px; margin-bottom:8px; }
+    .doc-header h1,.doc-header h2{ margin:2px 0; font-size:13pt; }
+    .doc-header h3{ font-size:14pt; text-decoration:underline; margin-top:10px; }
+    hr{ border:none; border-top:2px solid #111; margin:10px 0 22px; }
+    p{ text-align:justify; }
+    table.fields{ width:100%; border-collapse:collapse; margin-top:10px; }
+    table.fields td{ padding:5px 0; vertical-align:top; }
+    table.fields td.label{ width:200px; }
+    table.fields td.colon{ width:16px; }
+    .sign{ margin-top:50px; width:100%; }
+    .sign td{ width:50%; text-align:center; vertical-align:top; }
+    .sign .space{ height:70px; }
+    @media print{ .no-print{ display:none; } }
+  </style>
+  </head><body>
+    <div class="doc-header">
+      <img src="${SUMEDANG_LOGO_DATA_URL}" alt="Logo Kabupaten Sumedang">
+      <h1>PEMERINTAH KABUPATEN SUMEDANG</h1>
+      <h2>DINAS TENAGA KERJA DAN TRANSMIGRASI</h2>
+      <h3>BERITA ACARA PEMELIHARAAN/PERBAIKAN BARANG MILIK DAERAH</h3>
+      <div>Nomor: ${escapeHtml(r.nomorBA)}</div>
+    </div>
+    <hr>
+    <p>Pada hari ini .................., tanggal .................., telah dilaksanakan pemeliharaan/perbaikan terhadap barang milik daerah dengan rincian sebagai berikut:</p>
+    <table class="fields">
+      <tr><td class="label">Kode Barang</td><td class="colon">:</td><td>${escapeHtml(a.kode||'-')}</td></tr>
+      <tr><td class="label">Nama Barang</td><td class="colon">:</td><td>${escapeHtml(a.nama||'-')}</td></tr>
+      <tr><td class="label">Jenis Pemeliharaan</td><td class="colon">:</td><td>${escapeHtml(r.jenis||'-')}</td></tr>
+      <tr><td class="label">Pelaksana</td><td class="colon">:</td><td>${escapeHtml(r.pelaksana||'-')}</td></tr>
+      <tr><td class="label">Biaya</td><td class="colon">:</td><td>${r.biaya ? ('Rp ' + Number(r.biaya).toLocaleString('id-ID')) : '-'}</td></tr>
+      <tr><td class="label">Kondisi Sebelum</td><td class="colon">:</td><td>${escapeHtml(r.kondisiSebelum||'-')}</td></tr>
+      <tr><td class="label">Kondisi Sesudah</td><td class="colon">:</td><td>${escapeHtml(r.kondisiSesudah||'-')}</td></tr>
+      <tr><td class="label">Keterangan</td><td class="colon">:</td><td>${escapeHtml(r.keterangan||'-')}</td></tr>
+    </table>
+    <table class="sign">
+      <tr><td>Yang Melaksanakan,</td><td>Mengetahui,</td></tr>
+      <tr><td class="space"></td><td class="space"></td></tr>
+      <tr><td>(Pelaksana/Vendor)</td><td>(Kepala Bidang Umum)</td></tr>
+    </table>
+    <div class="no-print" style="margin-top:40px;text-align:center;">
+      <button onclick="window.print()" style="padding:8px 16px;">Cetak</button>
+    </div>
+  </body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.onload = function(){ win.focus(); win.print(); };
 }
 
 /* ================= RENDER: IDENTIFIKASI ================= */
