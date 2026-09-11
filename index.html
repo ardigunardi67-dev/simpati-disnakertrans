@@ -515,10 +515,10 @@
     <div class="login-visual-content">
       <div class="login-visual-tag">SISTEM INFORMASI ASET DAERAH</div>
       <h2>Satu sistem untuk seluruh siklus barang milik daerah.</h2>
-      <p>Verifikasi, peminjaman, pemeliharaan, identifikasi, dan pencatatan aset terhubung dalam satu basis data yang sama — mendukung tata kelola BMD yang tertib, akurat, dan mudah dilacak.</p>
+      <p>Verifikasi, penggunaan, pemeliharaan, identifikasi, dan pencatatan aset terhubung dalam satu basis data yang sama — mendukung tata kelola BMD yang tertib, akurat, dan mudah dilacak.</p>
       <div class="login-visual-modules">
         <span>Verifikasi</span>
-        <span>Peminjaman</span>
+        <span>Penggunaan</span>
         <span>Pemeliharaan</span>
         <span>Identifikasi</span>
         <span>Pencatatan</span>
@@ -530,7 +530,7 @@
     <div class="login-mark">
       <span class="mark-letter">SIMPATI</span>
     </div>
-    <p class="login-sub">Sistem Informasi Verifikasi, Peminjaman, Pemeliharaan, Pencatatan Barang Milik Daerah dan Identifikasi<br>Dinas Tenaga Kerja dan Transmigrasi</p>
+    <p class="login-sub">Sistem Informasi Verifikasi, Penggunaan, Pemeliharaan, Pencatatan Barang Milik Daerah dan Identifikasi<br>Dinas Tenaga Kerja dan Transmigrasi</p>
     <div id="login-error-slot"></div>
     <form onsubmit="return handleLogin(event)">
       <div class="field">
@@ -555,7 +555,7 @@
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="mark-letter">SIMPATI</div>
-      <div class="mark-sub">Verifikasi · Peminjaman · Pemeliharaan · Identifikasi · Pencatatan BMD</div>
+      <div class="mark-sub">Verifikasi · Penggunaan · Pemeliharaan · Identifikasi · Pencatatan BMD</div>
     </div>
     <div class="nav-group" id="nav-group"></div>
     <div class="sidebar-foot">
@@ -600,16 +600,16 @@ const state = {
   excelImportStaged: null,
   identifikasiPreselectId: null,
   identifikasiFilterKategori: 'ALL',
-  data: { assets: [], verifikasi: [], peminjaman: [], pemeliharaan: [], identifikasi: [] },
-  formError: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
-  formSuccess: { verifikasi:null, peminjaman:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
+  data: { assets: [], verifikasi: [], penggunaan: [], pemeliharaan: [], identifikasi: [] },
+  formError: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
+  formSuccess: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
 };
 
 const NAV_ITEMS = [
   { key:'beranda', label:'Beranda' },
   { key:'pencatatan', label:'Pencatatan Aset' },
   { key:'identifikasi', label:'Identifikasi' },
-  { key:'peminjaman', label:'Peminjaman' },
+  { key:'penggunaan', label:'Penggunaan' },
   { key:'pemeliharaan', label:'Pemeliharaan' },
   { key:'verifikasi', label:'Verifikasi' },
   { key:'laporan', label:'Laporan' }
@@ -757,13 +757,13 @@ function seedData(){
     { id: uid('AST'), kib:'B', kode:'BMD-004', nama:'Proyektor Epson EB-X05', kategori:KIB_CATEGORIES.B, tahun:'2022', nilai:'5200000', lokasi:'Ruang Rapat Utama', kondisi:'Baik', statusKetersediaan:'Tersedia', statusVerifikasi:'Belum Diverifikasi', dibuat: todayISO(), ...blankKibFields(), nama:'Proyektor Epson EB-X05', jumlah:'1', satuan:'Unit', hargaSatuan:'5200000', tanggalPerolehan:'2022-08-01' }
   ];
   state.data.verifikasi = [];
-  state.data.peminjaman = [];
+  state.data.penggunaan = [];
   state.data.pemeliharaan = [];
   state.data.identifikasi = [];
 }
 
 async function initData(){
-  const keys = ['assets','verifikasi','peminjaman','pemeliharaan','identifikasi'];
+  const keys = ['assets','verifikasi','penggunaan','pemeliharaan','identifikasi'];
   const results = await Promise.all(keys.map(loadCollection));
   let anyFound = false;
   keys.forEach((k,i)=>{ if(results[i]){ state.data[k] = results[i]; anyFound = true; } });
@@ -841,11 +841,11 @@ function renderNav(){
 const TITLES = {
   beranda:['Beranda','Ringkasan pengelolaan barang milik daerah'],
   verifikasi:['Verifikasi Aset','Periksa kelengkapan dokumen dan status aset'],
-  peminjaman:['Peminjaman Aset','Catat permintaan pinjam dan cek ketersediaan aset'],
+  penggunaan:['Penggunaan Aset','Mencatat unit/pegawai penanggung jawab dan lokasi penempatan aset'],
   pemeliharaan:['Pemeliharaan Aset','Jadwalkan perawatan dan catat riwayat perbaikan'],
   identifikasi:['Identifikasi Aset','Tetapkan kode, lokasi, dan kondisi terkini aset'],
   pencatatan:['Pencatatan Aset','Daftarkan aset baru ke dalam basis data BMD'],
-  laporan:['Laporan BMD','Rekap inventaris, peminjaman, pemeliharaan, dan identifikasi']
+  laporan:['Laporan BMD','Rekap inventaris, penggunaan, pemeliharaan, dan identifikasi']
 };
 
 /* ---------------- HELPERS: assets ---------------- */
@@ -857,7 +857,7 @@ function assetOptions(selectedId){
 }
 function statusBadge(status){
   const map = {
-    'Tersedia':'badge-good', 'Dipinjam':'badge-warn', 'Pemeliharaan':'badge-bad',
+    'Tersedia':'badge-good', 'Digunakan':'badge-warn', 'Pemeliharaan':'badge-bad',
     'Belum Diverifikasi':'badge-neutral', 'Terverifikasi':'badge-good',
     'Baik':'badge-good', 'Rusak Ringan':'badge-warn', 'Rusak Berat':'badge-bad',
     'Berjalan':'badge-warn', 'Selesai':'badge-good'
@@ -870,13 +870,13 @@ function renderBeranda(){
   const a = state.data.assets;
   const total = a.length;
   const tersedia = a.filter(x=>x.statusKetersediaan==='Tersedia').length;
-  const dipinjam = a.filter(x=>x.statusKetersediaan==='Dipinjam').length;
+  const digunakan = a.filter(x=>x.statusKetersediaan==='Digunakan').length;
   const pemeliharaan = a.filter(x=>x.statusKetersediaan==='Pemeliharaan').length;
   const rusak = a.filter(x=>x.kondisi==='Rusak Ringan'||x.kondisi==='Rusak Berat').length;
 
   const recent = []
     .concat(state.data.verifikasi.map(x=>({t:x.tanggal, kind:'Verifikasi', text:`Verifikasi ${assetLabel(x.assetId)} — ${x.valid?'valid':'tidak valid'}`})))
-    .concat(state.data.peminjaman.map(x=>({t:x.tglPinjam, kind:'Peminjaman', text:`${escapeHtml(x.peminjam)} meminjam ${assetLabel(x.assetId)}`})))
+    .concat(state.data.penggunaan.map(x=>({t:x.tglMulai, kind:'Penggunaan', text:`${escapeHtml(x.penanggungJawab)} menggunakan ${assetLabel(x.assetId)}`})))
     .concat(state.data.pemeliharaan.map(x=>({t:x.tanggal, kind:'Pemeliharaan', text:`${x.jenis} pada ${assetLabel(x.assetId)}`})))
     .concat(state.data.identifikasi.map(x=>({t:x.tanggal, kind:'Identifikasi', text:`Identifikasi ${assetLabel(x.assetId)} di ${escapeHtml(x.lokasi)}`})))
     .sort((p,q)=> (q.t||'').localeCompare(p.t||''))
@@ -893,7 +893,7 @@ function renderBeranda(){
     <div class="stat-grid">
       <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset tercatat</div></div>
       <div class="stat-card c-good"><div class="num">${tersedia}</div><div class="lbl">Tersedia</div></div>
-      <div class="stat-card c-warn"><div class="num">${dipinjam}</div><div class="lbl">Sedang dipinjam</div></div>
+      <div class="stat-card c-warn"><div class="num">${digunakan}</div><div class="lbl">Sedang digunakan</div></div>
       <div class="stat-card c-bad"><div class="num">${pemeliharaan}</div><div class="lbl">Dalam pemeliharaan</div></div>
       <div class="stat-card c-warn"><div class="num">${rusak}</div><div class="lbl">Kondisi rusak</div></div>
     </div>
@@ -1006,121 +1006,195 @@ async function handleVerifikasiSubmit(ev){
 }
 
 /* ================= RENDER: PEMINJAMAN ================= */
-function renderPeminjaman(){
-  const err = state.formError.peminjaman;
-  const ok = state.formSuccess.peminjaman;
+function renderPenggunaan(){
+  const err = state.formError.penggunaan;
+  const ok = state.formSuccess.penggunaan;
   return `
     <div class="flow-steps">
-      <span class="flow-step"><b>1</b>Input data peminjam &amp; aset</span>
+      <span class="flow-step"><b>1</b>Input data pengguna &amp; aset</span>
       <span class="flow-step"><b>2</b>Cek ketersediaan aset</span>
-      <span class="flow-step"><b>3</b>Tersedia? Buat surat &amp; perbarui status</span>
+      <span class="flow-step"><b>3</b>Tersedia? Buat BAST &amp; perbarui status</span>
     </div>
     <div class="panel">
-      <div class="panel-head"><div><h2>Formulir peminjaman</h2><div class="desc">Aset hanya dapat dipinjam jika berstatus Tersedia</div></div></div>
+      <div class="panel-head"><div><h2>Formulir penggunaan aset</h2><div class="desc">Aset hanya dapat digunakan jika berstatus Tersedia</div></div></div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
         ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
-        <form onsubmit="return handlePeminjamanSubmit(event)">
+        <form onsubmit="return handlePenggunaanSubmit(event)">
           <div class="grid-2">
             <div class="field">
-              <label for="pj-asset">Aset</label>
-              <select id="pj-asset">${assetOptions()}</select>
+              <label for="pg-asset">Kode / No. Register Aset</label>
+              <select id="pg-asset">${assetOptions()}</select>
             </div>
             <div class="field">
-              <label for="pj-nama">Nama peminjam</label>
-              <input id="pj-nama" type="text" placeholder="Nama lengkap">
+              <label for="pg-unit">Unit/Bidang Pengguna</label>
+              <input id="pg-unit" type="text" placeholder="mis. Bidang Pelatihan Kerja">
             </div>
           </div>
           <div class="grid-2">
             <div class="field">
-              <label for="pj-unit">Unit / bidang</label>
-              <input id="pj-unit" type="text" placeholder="mis. Bidang Pelatihan Kerja">
+              <label for="pg-pj">Nama Pegawai Penanggung Jawab</label>
+              <input id="pg-pj" type="text" placeholder="Nama lengkap">
             </div>
             <div class="field">
-              <label for="pj-tgl-kembali">Rencana tanggal kembali</label>
-              <input id="pj-tgl-kembali" type="date">
+              <label for="pg-tgl">Tanggal Mulai Digunakan</label>
+              <input id="pg-tgl" type="date" value="${todayISO()}">
             </div>
           </div>
           <div class="field">
-            <label for="pj-keperluan">Keperluan</label>
-            <textarea id="pj-keperluan" rows="2" placeholder="Keperluan peminjaman..."></textarea>
+            <label for="pg-lokasi">Lokasi Penempatan (ruangan/gedung)</label>
+            <input id="pg-lokasi" type="text" placeholder="mis. Ruang Penempatan Kerja">
           </div>
-          <div class="form-actions"><button type="submit" class="btn btn-primary">Ajukan peminjaman</button></div>
+          <div class="field">
+            <label for="pg-ket">Keterangan/Kondisi Saat Diserahkan</label>
+            <textarea id="pg-ket" rows="2" placeholder="mis. Kondisi baik, lengkap dengan charger..."></textarea>
+          </div>
+          <div class="field">
+            <label>Upload Dokumen Serah Terima (opsional)</label><br>
+            <button type="button" class="btn btn-ghost" onclick="alert('Fitur unggah dokumen akan tersedia pada pembaruan berikutnya.')">Unggah Dokumen</button>
+            <div class="hint-text">Tombol tersedia sebagai penanda tempat — penyimpanan berkas akan diaktifkan pada tahap pengembangan berikutnya.</div>
+          </div>
+          <div class="form-actions" style="margin-top:8px;"><button type="submit" class="btn btn-primary">Simpan penggunaan</button></div>
         </form>`}
       </div>
     </div>
-    ${renderPeminjamanTable()}
+    ${renderPenggunaanTable()}
   `;
 }
-function renderPeminjamanTable(){
-  const rows = [...state.data.peminjaman].sort((a,b)=>b.tglPinjam.localeCompare(a.tglPinjam));
+function renderPenggunaanTable(){
+  const rows = [...state.data.penggunaan].sort((a,b)=>b.tglMulai.localeCompare(a.tglMulai));
   return `
     <div class="panel">
-      <div class="panel-head"><div><h2>Riwayat peminjaman</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-head"><div><h2>Output Tabel Daftar Penggunaan Aset</h2><div class="desc">${rows.length} catatan</div></div></div>
       <div class="panel-body" style="padding:0;">
         <table>
-          <thead><tr><th>No. Surat</th><th>Aset</th><th>Peminjam</th><th>Unit</th><th>Pinjam</th><th>Rencana kembali</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>No</th><th>Kode Aset</th><th>Nama Aset</th><th>Unit Pengguna</th><th>Penanggung Jawab</th><th>Tgl Mulai</th><th>Lokasi</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            ${rows.length ? rows.map(r=>`
+            ${rows.length ? rows.map((r,i)=>`
               <tr>
-                <td class="mono">${r.nomorSurat}</td>
+                <td>${i+1}</td>
+                <td class="mono">${getAsset(r.assetId)?escapeHtml(getAsset(r.assetId).kode):'—'}</td>
                 <td>${assetLabel(r.assetId)}</td>
-                <td>${escapeHtml(r.peminjam)}</td>
-                <td>${escapeHtml(r.unit||'—')}</td>
-                <td>${fmtDate(r.tglPinjam)}</td>
-                <td>${fmtDate(r.rencanaKembali)}</td>
+                <td>${escapeHtml(r.unitPengguna||'—')}</td>
+                <td>${escapeHtml(r.penanggungJawab)}</td>
+                <td>${fmtDate(r.tglMulai)}</td>
+                <td>${escapeHtml(r.lokasiPenempatan||'—')}</td>
                 <td>${statusBadge(r.status)}</td>
-                <td>${r.status==='Dipinjam' ? `<button class="btn btn-ghost btn-sm" onclick="handleKembalikan('${r.id}')">Kembalikan</button>` : ''}</td>
-              </tr>`).join('') : '<tr class="empty-row"><td colspan="8">Belum ada riwayat peminjaman.</td></tr>'}
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="handlePrintBAST('${r.id}')">Cetak Bukti</button>
+                  ${r.status==='Digunakan' ? `<button class="btn btn-ghost btn-sm" onclick="handleMutasiPenggunaan('${r.id}')">Mutasi/Selesai</button>` : ''}
+                </td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="9">Belum ada riwayat penggunaan.</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>
   `;
 }
-async function handlePeminjamanSubmit(ev){
+async function handlePenggunaanSubmit(ev){
   ev.preventDefault();
-  const assetId = document.getElementById('pj-asset').value;
-  const peminjam = document.getElementById('pj-nama').value.trim();
-  const unit = document.getElementById('pj-unit').value.trim();
-  const rencanaKembali = document.getElementById('pj-tgl-kembali').value;
-  const keperluan = document.getElementById('pj-keperluan').value.trim();
+  const assetId = document.getElementById('pg-asset').value;
+  const unitPengguna = document.getElementById('pg-unit').value.trim();
+  const penanggungJawab = document.getElementById('pg-pj').value.trim();
+  const tglMulai = document.getElementById('pg-tgl').value || todayISO();
+  const lokasiPenempatan = document.getElementById('pg-lokasi').value.trim();
+  const keteranganKondisi = document.getElementById('pg-ket').value.trim();
   const asset = getAsset(assetId);
 
-  if(!peminjam){
-    state.formError.peminjaman = 'Nama peminjam wajib diisi.';
+  if(!penanggungJawab){
+    state.formError.penggunaan = 'Nama pegawai penanggung jawab wajib diisi.';
     renderApp(); return false;
   }
   if(!asset || asset.statusKetersediaan !== 'Tersedia'){
-    state.formSuccess.peminjaman = null;
-    state.formError.peminjaman = `Aset tidak tersedia. Status aset saat ini: ${asset? statusBadge(asset.statusKetersediaan) : 'tidak ditemukan'}.`;
+    state.formSuccess.penggunaan = null;
+    state.formError.penggunaan = `Aset tidak tersedia. Status aset saat ini: ${asset? statusBadge(asset.statusKetersediaan) : 'tidak ditemukan'}.`;
     renderApp(); return false;
   }
   const record = {
-    id: uid('PJM'), assetId, peminjam, unit, keperluan,
-    tglPinjam: todayISO(), rencanaKembali, tglKembaliAktual:null,
-    status:'Dipinjam', nomorSurat: 'SP/' + Date.now().toString().slice(-6) + '/BMD'
+    id: uid('PGN'), assetId, unitPengguna, penanggungJawab, tglMulai, lokasiPenempatan, keteranganKondisi,
+    status:'Digunakan', nomorBAST: 'BAST-BMD/' + Date.now().toString().slice(-6) + '/DTKT'
   };
-  state.data.peminjaman.push(record);
-  asset.statusKetersediaan = 'Dipinjam';
-  state.formError.peminjaman = null;
-  state.formSuccess.peminjaman = `Aset tersedia. Surat peminjaman ${record.nomorSurat} dibuat dan status aset diperbarui menjadi Dipinjam.`;
-  await saveCollection('peminjaman');
+  state.data.penggunaan.push(record);
+  asset.statusKetersediaan = 'Digunakan';
+  if(lokasiPenempatan) asset.lokasi = lokasiPenempatan;
+  state.formError.penggunaan = null;
+  state.formSuccess.penggunaan = `Aset tersedia. BAST ${record.nomorBAST} dibuat dan status aset diperbarui menjadi Digunakan.`;
+  await saveCollection('penggunaan');
   await saveCollection('assets');
   renderApp();
   return false;
 }
-async function handleKembalikan(id){
-  const r = state.data.peminjaman.find(x=>x.id===id);
+async function handleMutasiPenggunaan(id){
+  const r = state.data.penggunaan.find(x=>x.id===id);
   if(!r) return;
   r.status = 'Selesai';
-  r.tglKembaliAktual = todayISO();
   const asset = getAsset(r.assetId);
   if(asset) asset.statusKetersediaan = 'Tersedia';
-  await saveCollection('peminjaman');
+  await saveCollection('penggunaan');
   await saveCollection('assets');
   renderApp();
+}
+function handlePrintBAST(recordId){
+  const r = state.data.penggunaan.find(x=>x.id===recordId);
+  if(!r) return;
+  const a = getAsset(r.assetId);
+  if(!a) return;
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ alert('Popup diblokir oleh browser. Izinkan popup untuk mencetak Berita Acara.'); return; }
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+  <title>BAST - ${r.nomorBAST}</title>
+  <style>
+    @page{ size: A4; margin: 2.2cm; }
+    body{ font-family: 'Times New Roman', serif; color:#111; font-size:13pt; line-height:1.5; }
+    .doc-header{ text-align:center; margin-bottom:6px; }
+    .doc-header img{ height:64px; margin-bottom:8px; }
+    .doc-header h1,.doc-header h2{ margin:2px 0; font-size:13pt; }
+    .doc-header h3{ font-size:14pt; text-decoration:underline; margin-top:10px; }
+    hr{ border:none; border-top:2px solid #111; margin:10px 0 22px; }
+    p{ text-align:justify; }
+    table.fields{ width:100%; border-collapse:collapse; margin-top:10px; }
+    table.fields td{ padding:5px 0; vertical-align:top; }
+    table.fields td.label{ width:200px; }
+    table.fields td.colon{ width:16px; }
+    .sign{ margin-top:50px; width:100%; }
+    .sign td{ width:50%; text-align:center; vertical-align:top; }
+    .sign .space{ height:70px; }
+    @media print{ .no-print{ display:none; } }
+  </style>
+  </head><body>
+    <div class="doc-header">
+      <img src="${SUMEDANG_LOGO_DATA_URL}" alt="Logo Kabupaten Sumedang">
+      <h1>PEMERINTAH KABUPATEN SUMEDANG</h1>
+      <h2>DINAS TENAGA KERJA DAN TRANSMIGRASI</h2>
+      <h3>BERITA ACARA SERAH TERIMA PENGGUNAAN BARANG MILIK DAERAH</h3>
+      <div>Nomor: ${escapeHtml(r.nomorBAST)}</div>
+    </div>
+    <hr>
+    <p>Pada hari ini .................., tanggal .................., telah dilaksanakan serah terima penggunaan barang milik daerah dengan rincian sebagai berikut:</p>
+    <table class="fields">
+      <tr><td class="label">Kode Barang</td><td class="colon">:</td><td>${escapeHtml(a.kode||'-')}</td></tr>
+      <tr><td class="label">Nama Barang</td><td class="colon">:</td><td>${escapeHtml(a.nama||'-')}</td></tr>
+      <tr><td class="label">Merk/Tipe</td><td class="colon">:</td><td>${escapeHtml(a.merekTipe || a.spesifikasi || '-')}</td></tr>
+      <tr><td class="label">Kondisi</td><td class="colon">:</td><td>${escapeHtml(r.keteranganKondisi || a.kondisi || '-')}</td></tr>
+      <tr><td class="label">Diserahkan Kepada</td><td class="colon">:</td><td>${escapeHtml(r.penanggungJawab||'-')}</td></tr>
+      <tr><td class="label">Unit/Bidang</td><td class="colon">:</td><td>${escapeHtml(r.unitPengguna||'-')}</td></tr>
+      <tr><td class="label">Lokasi</td><td class="colon">:</td><td>${escapeHtml(r.lokasiPenempatan||'-')}</td></tr>
+      <tr><td class="label">Tanggal Mulai</td><td class="colon">:</td><td>${fmtDate(r.tglMulai)}</td></tr>
+    </table>
+    <table class="sign">
+      <tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr>
+      <tr><td class="space"></td><td class="space"></td></tr>
+      <tr><td>(Pengurus Barang)</td><td>(${escapeHtml(r.penanggungJawab||'Penanggung Jawab')})</td></tr>
+    </table>
+    <div class="no-print" style="margin-top:40px;text-align:center;">
+      <button onclick="window.print()" style="padding:8px 16px;">Cetak</button>
+    </div>
+  </body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.onload = function(){ win.focus(); win.print(); };
 }
 
 /* ================= RENDER: PEMELIHARAAN ================= */
@@ -1134,7 +1208,7 @@ function renderPemeliharaan(){
       <span class="flow-step"><b>3</b>Perbarui riwayat &amp; simpan</span>
     </div>
     <div class="panel">
-      <div class="panel-head"><div><h2>Formulir pemeliharaan</h2><div class="desc">Aset yang sedang dipinjam tidak dapat dijadwalkan pemeliharaan</div></div></div>
+      <div class="panel-head"><div><h2>Formulir pemeliharaan</h2><div class="desc">Aset yang sedang digunakan tidak dapat dijadwalkan pemeliharaan</div></div></div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
@@ -1200,9 +1274,9 @@ async function handlePemeliharaanSubmit(ev){
   const catatan = document.getElementById('pm-catatan').value.trim();
   const asset = getAsset(assetId);
 
-  if(asset && asset.statusKetersediaan === 'Dipinjam'){
+  if(asset && asset.statusKetersediaan === 'Digunakan'){
     state.formSuccess.pemeliharaan = null;
-    state.formError.pemeliharaan = 'Aset sedang dipinjam sehingga belum dapat dijadwalkan pemeliharaan. Tunggu aset dikembalikan terlebih dahulu.';
+    state.formError.pemeliharaan = 'Aset sedang digunakan sehingga belum dapat dijadwalkan pemeliharaan. Hentikan penggunaannya terlebih dahulu.';
     renderApp(); return false;
   }
   const record = { id: uid('PML'), assetId, jenis, jadwal, catatan, status:'Berjalan', tanggal: todayISO() };
@@ -1728,10 +1802,10 @@ async function handleHapusAset(id){
   if(!confirm('Hapus aset ini beserta riwayat yang tercatat? Tindakan ini tidak dapat dibatalkan.')) return;
   state.data.assets = state.data.assets.filter(a=>a.id!==id);
   state.data.verifikasi = state.data.verifikasi.filter(r=>r.assetId!==id);
-  state.data.peminjaman = state.data.peminjaman.filter(r=>r.assetId!==id);
+  state.data.penggunaan = state.data.penggunaan.filter(r=>r.assetId!==id);
   state.data.pemeliharaan = state.data.pemeliharaan.filter(r=>r.assetId!==id);
   state.data.identifikasi = state.data.identifikasi.filter(r=>r.assetId!==id);
-  await Promise.all(['assets','verifikasi','peminjaman','pemeliharaan','identifikasi'].map(saveCollection));
+  await Promise.all(['assets','verifikasi','penggunaan','pemeliharaan','identifikasi'].map(saveCollection));
   renderApp();
 }
 function openAssetDetail(id){
@@ -1864,7 +1938,7 @@ function renderLaporan(){
   const a = state.data.assets;
   const total = a.length;
   const tersedia = a.filter(x=>x.statusKetersediaan==='Tersedia').length;
-  const dipinjam = a.filter(x=>x.statusKetersediaan==='Dipinjam').length;
+  const digunakan = a.filter(x=>x.statusKetersediaan==='Digunakan').length;
   const pemeliharaan = a.filter(x=>x.statusKetersediaan==='Pemeliharaan').length;
   const terverifikasi = a.filter(x=>x.statusVerifikasi==='Terverifikasi').length;
 
@@ -1875,7 +1949,7 @@ function renderLaporan(){
     <div class="stat-grid">
       <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total aset</div></div>
       <div class="stat-card c-good"><div class="num">${terverifikasi}</div><div class="lbl">Terverifikasi</div></div>
-      <div class="stat-card c-warn"><div class="num">${dipinjam}</div><div class="lbl">Dipinjam</div></div>
+      <div class="stat-card c-warn"><div class="num">${digunakan}</div><div class="lbl">Digunakan</div></div>
       <div class="stat-card c-bad"><div class="num">${pemeliharaan}</div><div class="lbl">Pemeliharaan</div></div>
       <div class="stat-card c-good"><div class="num">${tersedia}</div><div class="lbl">Tersedia</div></div>
     </div>
@@ -1900,15 +1974,15 @@ function renderLaporan(){
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><div><h2>Riwayat peminjaman aktif</h2></div></div>
+      <div class="panel-head"><div><h2>Aset sedang digunakan</h2></div></div>
       <div class="panel-body" style="padding:0;">
         <table>
-          <thead><tr><th>No. Surat</th><th>Aset</th><th>Peminjam</th><th>Unit</th><th>Pinjam</th><th>Rencana kembali</th></tr></thead>
+          <thead><tr><th>No. BAST</th><th>Aset</th><th>Penanggung Jawab</th><th>Unit/Bidang</th><th>Tgl Mulai</th><th>Lokasi</th></tr></thead>
           <tbody>
-            ${state.data.peminjaman.filter(r=>r.status==='Dipinjam').length ?
-              state.data.peminjaman.filter(r=>r.status==='Dipinjam').map(r=>`
-                <tr><td class="mono">${r.nomorSurat}</td><td>${assetLabel(r.assetId)}</td><td>${escapeHtml(r.peminjam)}</td><td>${escapeHtml(r.unit||'—')}</td><td>${fmtDate(r.tglPinjam)}</td><td>${fmtDate(r.rencanaKembali)}</td></tr>
-              `).join('') : '<tr class="empty-row"><td colspan="6">Tidak ada peminjaman aktif.</td></tr>'}
+            ${state.data.penggunaan.filter(r=>r.status==='Digunakan').length ?
+              state.data.penggunaan.filter(r=>r.status==='Digunakan').map(r=>`
+                <tr><td class="mono">${r.nomorBAST}</td><td>${assetLabel(r.assetId)}</td><td>${escapeHtml(r.penanggungJawab)}</td><td>${escapeHtml(r.unitPengguna||'—')}</td><td>${fmtDate(r.tglMulai)}</td><td>${escapeHtml(r.lokasiPenempatan||'—')}</td></tr>
+              `).join('') : '<tr class="empty-row"><td colspan="6">Tidak ada aset yang sedang digunakan.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1940,7 +2014,7 @@ function renderApp(){
   let html = '';
   switch(state.view){
     case 'verifikasi': html = renderVerifikasi(); break;
-    case 'peminjaman': html = renderPeminjaman(); break;
+    case 'penggunaan': html = renderPenggunaan(); break;
     case 'pemeliharaan': html = renderPemeliharaan(); break;
     case 'identifikasi': html = renderIdentifikasi(); break;
     case 'pencatatan': html = renderPencatatan(); break;
