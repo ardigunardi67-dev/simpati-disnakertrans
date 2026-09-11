@@ -530,21 +530,29 @@
     <div class="login-mark">
       <span class="mark-letter">SIMPATI</span>
     </div>
-    <p class="login-sub">Sistem Informasi Verifikasi, Penggunaan, Pemeliharaan, Pencatatan Barang Milik Daerah dan Identifikasi<br>Dinas Tenaga Kerja dan Transmigrasi</p>
+    <h2 style="font-size:20px;margin:8px 0 4px;color:var(--navy-900);">Masuk ke akun Anda</h2>
+    <p class="login-sub" style="border-bottom:none;padding-bottom:0;margin-bottom:20px;">Gunakan NIP dan kata sandi yang terdaftar di sistem.</p>
     <div id="login-error-slot"></div>
     <form onsubmit="return handleLogin(event)">
       <div class="field">
-        <label for="li-username">Nama pengguna</label>
-        <input id="li-username" type="text" autocomplete="username" placeholder="mis. admin">
+        <label for="li-username">NIP / Nama Pengguna</label>
+        <input id="li-username" type="text" autocomplete="username" placeholder="mis. 198501012010011001">
       </div>
       <div class="field">
         <label for="li-password">Kata sandi</label>
-        <input id="li-password" type="password" autocomplete="current-password" placeholder="••••••••">
+        <input id="li-password" type="password" autocomplete="current-password" placeholder="Masukkan kata sandi">
+      </div>
+      <div class="field">
+        <label for="li-role">Masuk sebagai</label>
+        <select id="li-role">
+          <option value="pengurus_barang">Pengurus Barang</option>
+          <option value="verifikator">Verifikator</option>
+        </select>
       </div>
       <button type="submit" class="btn btn-primary btn-block">Masuk</button>
     </form>
     <div class="login-hint">
-      <b>Versi prototipe.</b> Gunakan admin / admin123 untuk masuk. Data aset tersimpan bersama untuk seluruh pengguna sistem ini dan akan terus ada di percobaan berikutnya. Autentikasi resmi dapat dikembangkan pada tahap revisi berikutnya.
+      <b>Versi prototipe.</b> Akun demo — Pengurus Barang: NIP <b>198501012010011001</b> / sandi <b>petugas123</b>. Verifikator: NIP <b>198703152012012002</b> / sandi <b>verif123</b>. Admin (Kelola Pengguna): NIP <b>199001012015011001</b> / sandi <b>admin123</b>. Data aset tersimpan bersama untuk seluruh pengguna sistem ini.
     </div>
   </div>
   </div>
@@ -561,7 +569,7 @@
     <div class="sidebar-foot">
       <div class="sidebar-user">
         <span id="sidebar-username">—</span>
-        <span class="role">Operator BMD</span>
+        <span class="role" id="sidebar-role">—</span>
       </div>
       <button class="btn btn-ghost btn-block btn-sm" style="color:#DCE8EF;border-color:rgba(255,255,255,0.25);" onclick="handleLogout()">Keluar</button>
     </div>
@@ -588,11 +596,34 @@
    sehingga terlihat oleh semua pengguna sistem ini.
    ========================================================= */
 
-const DEMO_USER = { username: 'admin', password: 'admin123' };
+const ROLE_LABELS = {
+  pengurus_barang: 'Pengurus Barang',
+  verifikator: 'Verifikator',
+  admin: 'Admin Pengelola Aset'
+};
+/* Menu yang boleh diakses tiap peran. 'beranda' dan 'laporan' selalu diizinkan untuk semua peran.
+   'admin' tidak muncul di dropdown login publik — hanya dikenali lewat NIP & kata sandi akunnya sendiri. */
+const ROLE_MENUS = {
+  pengurus_barang: ['beranda', 'pencatatan', 'identifikasi', 'penggunaan', 'pemeliharaan', 'laporan'],
+  verifikator: ['beranda', 'verifikasi', 'laporan'],
+  admin: ['beranda', 'kelola_pengguna', 'laporan']
+};
+function roleCanAccess(role, view){
+  if(view==='beranda' || view==='laporan') return true;
+  return (ROLE_MENUS[role] || []).includes(view);
+}
+function seedUsers(){
+  return [
+    { id: uid('USR'), nip:'198501012010011001', nama:'Petugas Pengurus Barang', password:'petugas123', role:'pengurus_barang', dibuat: todayISO() },
+    { id: uid('USR'), nip:'198703152012012002', nama:'Petugas Verifikator', password:'verif123', role:'verifikator', dibuat: todayISO() },
+    { id: uid('USR'), nip:'199001012015011001', nama:'Administrator Sistem', password:'admin123', role:'admin', dibuat: todayISO() }
+  ];
+}
 
 const state = {
   loggedIn: false,
   username: '',
+  role: null,
   view: 'beranda',
   loaded: false,
   pencatatanKategori: 'A',
@@ -606,9 +637,10 @@ const state = {
   editingVerifikasiId: null,
   verifikasiFilterStatus: 'ALL',
   verifikasiFilterTahun: 'ALL',
-  data: { assets: [], verifikasi: [], penggunaan: [], pemeliharaan: [], identifikasi: [] },
-  formError: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
-  formSuccess: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
+  editingUserId: null,
+  data: { assets: [], verifikasi: [], penggunaan: [], pemeliharaan: [], identifikasi: [], users: [] },
+  formError: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null, pengguna:null },
+  formSuccess: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null, pengguna:null }
 };
 
 const NAV_ITEMS = [
@@ -618,6 +650,7 @@ const NAV_ITEMS = [
   { key:'penggunaan', label:'Penggunaan' },
   { key:'pemeliharaan', label:'Pemeliharaan' },
   { key:'verifikasi', label:'Verifikasi' },
+  { key:'kelola_pengguna', label:'Kelola Pengguna' },
   { key:'laporan', label:'Laporan' }
 ];
 
@@ -769,13 +802,17 @@ function seedData(){
 }
 
 async function initData(){
-  const keys = ['assets','verifikasi','penggunaan','pemeliharaan','identifikasi'];
+  const keys = ['assets','verifikasi','penggunaan','pemeliharaan','identifikasi','users'];
   const results = await Promise.all(keys.map(loadCollection));
   let anyFound = false;
   keys.forEach((k,i)=>{ if(results[i]){ state.data[k] = results[i]; anyFound = true; } });
   if(!anyFound){
     seedData();
     await Promise.all(keys.map(saveCollection));
+  }
+  if(!state.data.users || state.data.users.length===0){
+    state.data.users = seedUsers();
+    await saveCollection('users');
   }
   state.loaded = true;
 }
@@ -786,22 +823,27 @@ function handleLogin(ev){
   ev.preventDefault();
   const u = document.getElementById('li-username').value.trim();
   const p = document.getElementById('li-password').value;
-  if(u === DEMO_USER.username && p === DEMO_USER.password){
+  const match = state.data.users.find(x => x.nip === u && x.password === p);
+  if(match){
     state.loggedIn = true;
-    state.username = u;
-    try{ localStorage.setItem(SESSION_KEY, u); }catch(e){}
+    state.username = match.nip;
+    state.role = match.role;
+    state.view = 'beranda';
+    try{ localStorage.setItem(SESSION_KEY, JSON.stringify({ u: match.nip, role: match.role })); }catch(e){}
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').classList.add('active');
-    document.getElementById('sidebar-username').textContent = u;
+    document.getElementById('sidebar-username').textContent = match.nama || match.nip;
+    document.getElementById('sidebar-role').textContent = ROLE_LABELS[match.role] || match.role;
     renderApp();
   } else {
     document.getElementById('login-error-slot').innerHTML =
-      '<div class="login-error">Nama pengguna atau kata sandi salah. Gunakan admin / admin123.</div>';
+      '<div class="login-error">NIP atau kata sandi tidak sesuai.</div>';
   }
   return false;
 }
 function handleLogout(){
   state.loggedIn = false;
+  state.role = null;
   try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
   document.getElementById('app-shell').classList.remove('active');
   document.getElementById('login-screen').style.display = 'flex';
@@ -810,13 +852,18 @@ function handleLogout(){
 }
 function restoreSession(){
   try{
-    const u = localStorage.getItem(SESSION_KEY);
-    if(u === DEMO_USER.username){
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return false;
+    const { u, role } = JSON.parse(raw);
+    const match = state.data.users.find(x => x.nip === u && x.role === role);
+    if(match){
       state.loggedIn = true;
-      state.username = u;
+      state.username = match.nip;
+      state.role = match.role;
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-shell').classList.add('active');
-      document.getElementById('sidebar-username').textContent = u;
+      document.getElementById('sidebar-username').textContent = match.nama || match.nip;
+      document.getElementById('sidebar-role').textContent = ROLE_LABELS[match.role] || match.role;
       return true;
     }
   }catch(e){}
@@ -825,12 +872,14 @@ function restoreSession(){
 
 /* ---------------- NAV / SHELL ---------------- */
 function goTo(view){
+  if(!roleCanAccess(state.role, view)){ return; }
   state.view = view;
   state.editingAssetId = null;
   state.excelImportStaged = null;
   state.identifikasiPreselectId = null;
   state.editingPemeliharaanId = null;
   state.editingVerifikasiId = null;
+  state.editingUserId = null;
   Object.keys(state.formError).forEach(k=>state.formError[k]=null);
   Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
   renderApp();
@@ -838,7 +887,8 @@ function goTo(view){
 }
 
 function renderNav(){
-  const html = NAV_ITEMS.map(item => `
+  const items = NAV_ITEMS.filter(item => roleCanAccess(state.role, item.key));
+  const html = items.map(item => `
     <div class="nav-item ${state.view===item.key?'active':''}" onclick="goTo('${item.key}')">
       <span class="dot"></span>${item.label}
     </div>
@@ -853,6 +903,7 @@ const TITLES = {
   pemeliharaan:['Pemeliharaan Aset','Jadwalkan perawatan dan catat riwayat perbaikan'],
   identifikasi:['Identifikasi Aset','Tetapkan kode, lokasi, dan kondisi terkini aset'],
   pencatatan:['Pencatatan Aset','Daftarkan aset baru ke dalam basis data BMD'],
+  kelola_pengguna:['Kelola Pengguna','Tambah, ubah, dan hapus akun pengguna sistem'],
   laporan:['Laporan BMD','Rekap inventaris, penggunaan, pemeliharaan, dan identifikasi']
 };
 
@@ -2356,6 +2407,148 @@ window.addEventListener('afterprint', function(){
   document.body.classList.remove('printing-label');
 });
 
+/* ================= RENDER: KELOLA PENGGUNA (khusus admin) ================= */
+function renderKelolaPengguna(){
+  const err = state.formError.pengguna;
+  const ok = state.formSuccess.pengguna;
+  const editing = state.editingUserId ? state.data.users.find(u=>u.id===state.editingUserId) : null;
+  return `
+    <div class="panel" id="form-pengguna-panel">
+      <div class="panel-head"><div><h2>${editing?'Edit pengguna':'Tambah pengguna baru'}</h2><div class="desc">Akun dipakai untuk login berdasarkan NIP dan kata sandi</div></div></div>
+      <div class="panel-body">
+        ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
+        ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
+        <form onsubmit="return handlePenggunaSubmit(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label for="pg-nama-user">Nama Lengkap</label>
+              <input id="pg-nama-user" type="text" value="${editing?escapeHtml(editing.nama||''):''}" placeholder="mis. Ahmad Fauzi">
+            </div>
+            <div class="field">
+              <label for="pg-nip">NIP / Nama Pengguna</label>
+              <input id="pg-nip" type="text" value="${editing?escapeHtml(editing.nip||''):''}" placeholder="mis. 198501012010011001">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="pg-password">Kata Sandi</label>
+              <input id="pg-password" type="text" value="${editing?escapeHtml(editing.password||''):''}" placeholder="Kata sandi login">
+            </div>
+            <div class="field">
+              <label for="pg-role">Peran</label>
+              <select id="pg-role">
+                <option value="pengurus_barang" ${!editing||editing.role==='pengurus_barang'?'selected':''}>Pengurus Barang</option>
+                <option value="verifikator" ${editing&&editing.role==='verifikator'?'selected':''}>Verifikator</option>
+                <option value="admin" ${editing&&editing.role==='admin'?'selected':''}>Admin Pengelola Aset</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top:8px;">
+            <button type="submit" class="btn btn-primary">${editing?'Simpan perubahan':'Tambah pengguna'}</button>
+            ${editing ? `<button type="button" class="btn btn-ghost" onclick="handleCancelEditPengguna()">Batal edit</button>` : ''}
+          </div>
+        </form>
+      </div>
+    </div>
+    ${renderKelolaPenggunaTable()}
+  `;
+}
+function renderKelolaPenggunaTable(){
+  const rows = [...state.data.users].sort((a,b)=>(a.nama||'').localeCompare(b.nama||''));
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Daftar Pengguna</h2><div class="desc">${rows.length} akun terdaftar</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Nama</th><th>NIP</th><th>Peran</th><th>Kata Sandi</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(u=>`
+              <tr>
+                <td>${escapeHtml(u.nama||'—')}</td>
+                <td class="mono">${escapeHtml(u.nip)}</td>
+                <td><span class="badge badge-neutral">${escapeHtml(ROLE_LABELS[u.role]||u.role)}</span></td>
+                <td class="mono">••••••••</td>
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="handleEditPengguna('${u.id}')">Edit</button>
+                  <button class="btn btn-ghost btn-sm" onclick="handleHapusPengguna('${u.id}')">Hapus</button>
+                </td>
+              </tr>`).join('') : '<tr class="empty-row"><td colspan="5">Belum ada pengguna.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function handleEditPengguna(id){
+  state.editingUserId = id;
+  state.formError.pengguna = null;
+  state.formSuccess.pengguna = null;
+  renderApp();
+  const panel = document.getElementById('form-pengguna-panel');
+  if(panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function handleCancelEditPengguna(){
+  state.editingUserId = null;
+  renderApp();
+}
+async function handlePenggunaSubmit(ev){
+  ev.preventDefault();
+  const editingId = state.editingUserId;
+  const nama = document.getElementById('pg-nama-user').value.trim();
+  const nip = document.getElementById('pg-nip').value.trim();
+  const password = document.getElementById('pg-password').value.trim();
+  const role = document.getElementById('pg-role').value;
+
+  if(!nama || !nip || !password){
+    state.formError.pengguna = 'Nama, NIP, dan kata sandi wajib diisi.';
+    renderApp(); return false;
+  }
+  const duplicate = state.data.users.some(u => u.nip===nip && u.id!==editingId);
+  if(duplicate){
+    state.formError.pengguna = 'NIP tersebut sudah dipakai pengguna lain.';
+    renderApp(); return false;
+  }
+
+  if(editingId){
+    const existing = state.data.users.find(u=>u.id===editingId);
+    const wasCurrentUser = existing && state.loggedIn && state.username===existing.nip;
+    if(existing){ Object.assign(existing, { nama, nip, password, role }); }
+    state.editingUserId = null;
+    state.formError.pengguna = null;
+    state.formSuccess.pengguna = 'Perubahan data pengguna berhasil disimpan.';
+    if(wasCurrentUser){
+      state.username = nip;
+      state.role = role;
+      document.getElementById('sidebar-username').textContent = nama;
+      document.getElementById('sidebar-role').textContent = ROLE_LABELS[role]||role;
+    }
+  } else {
+    state.data.users.push({ id: uid('USR'), nama, nip, password, role, dibuat: todayISO() });
+    state.formError.pengguna = null;
+    state.formSuccess.pengguna = `Pengguna "${escapeHtml(nama)}" berhasil ditambahkan sebagai ${ROLE_LABELS[role]||role}.`;
+  }
+  await saveCollection('users');
+  renderApp();
+  return false;
+}
+async function handleHapusPengguna(id){
+  const target = state.data.users.find(u=>u.id===id);
+  if(!target) return;
+  if(target.nip === state.username){
+    alert('Tidak dapat menghapus akun yang sedang digunakan untuk login saat ini.');
+    return;
+  }
+  const adminCount = state.data.users.filter(u=>u.role==='admin').length;
+  if(target.role==='admin' && adminCount<=1){
+    alert('Tidak dapat menghapus admin terakhir. Tambahkan admin lain terlebih dahulu sebelum menghapus akun ini.');
+    return;
+  }
+  if(!confirm('Hapus pengguna "'+ (target.nama||target.nip) +'"? Tindakan ini tidak dapat dibatalkan.')) return;
+  state.data.users = state.data.users.filter(u=>u.id!==id);
+  await saveCollection('users');
+  renderApp();
+}
+
 /* ================= RENDER: LAPORAN ================= */
 function renderLaporan(){
   const a = state.data.assets;
@@ -2441,6 +2634,7 @@ function renderApp(){
     case 'pemeliharaan': html = renderPemeliharaan(); break;
     case 'identifikasi': html = renderIdentifikasi(); break;
     case 'pencatatan': html = renderPencatatan(); break;
+    case 'kelola_pengguna': html = renderKelolaPengguna(); break;
     case 'laporan': html = renderLaporan(); break;
     default: html = renderBeranda();
   }
