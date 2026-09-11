@@ -603,6 +603,9 @@ const state = {
   editingPemeliharaanId: null,
   pemeliharaanFilterJenis: 'ALL',
   pemeliharaanFilterTahun: 'ALL',
+  editingVerifikasiId: null,
+  verifikasiFilterStatus: 'ALL',
+  verifikasiFilterTahun: 'ALL',
   data: { assets: [], verifikasi: [], penggunaan: [], pemeliharaan: [], identifikasi: [] },
   formError: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null },
   formSuccess: { verifikasi:null, penggunaan:null, pemeliharaan:null, identifikasi:null, pencatatan:null, importExcel:null }
@@ -827,6 +830,7 @@ function goTo(view){
   state.excelImportStaged = null;
   state.identifikasiPreselectId = null;
   state.editingPemeliharaanId = null;
+  state.editingVerifikasiId = null;
   Object.keys(state.formError).forEach(k=>state.formError[k]=null);
   Object.keys(state.formSuccess).forEach(k=>state.formSuccess[k]=null);
   renderApp();
@@ -862,8 +866,8 @@ function assetOptions(selectedId){
 function statusBadge(status){
   const map = {
     'Tersedia':'badge-good', 'Digunakan':'badge-warn', 'Pemeliharaan':'badge-bad',
-    'Belum Diverifikasi':'badge-neutral', 'Terverifikasi':'badge-good',
-    'Baik':'badge-good', 'Rusak Ringan':'badge-warn', 'Rusak Berat':'badge-bad',
+    'Belum Diverifikasi':'badge-neutral', 'Terverifikasi':'badge-good', 'Perlu Tindak Lanjut':'badge-bad',
+    'Baik':'badge-good', 'Rusak Ringan':'badge-warn', 'Rusak Berat':'badge-bad', 'Hilang':'badge-bad',
     'Berjalan':'badge-warn', 'Selesai':'badge-good'
   };
   return `<span class="badge ${map[status]||'badge-neutral'}">${escapeHtml(status)}</span>`;
@@ -923,90 +927,282 @@ function assetLabel(id){ const a=getAsset(id); return a ? `${escapeHtml(a.kode)}
 function renderVerifikasi(){
   const err = state.formError.verifikasi;
   const ok = state.formSuccess.verifikasi;
+  const editing = state.editingVerifikasiId ? state.data.verifikasi.find(r=>r.id===state.editingVerifikasiId) : null;
   return `
     <div class="flow-steps">
-      <span class="flow-step"><b>1</b>Input data aset &amp; dokumen</span>
-      <span class="flow-step"><b>2</b>Cek kelengkapan &amp; status aset</span>
-      <span class="flow-step"><b>3</b>Valid? Simpan &amp; perbarui status</span>
+      <span class="flow-step"><b>1</b>Cek fisik aset saat opname</span>
+      <span class="flow-step"><b>2</b>Bandingkan dengan data sistem</span>
+      <span class="flow-step"><b>3</b>Simpan hasil &amp; rekomendasi tindak lanjut</span>
     </div>
-    <div class="panel">
-      <div class="panel-head"><div><h2>Formulir verifikasi</h2><div class="desc">Pilih aset dan periksa kelengkapan dokumennya</div></div></div>
+    <div class="panel" id="form-verifikasi-panel">
+      <div class="panel-head"><div><h2>${editing ? 'Edit hasil verifikasi' : 'Formulir verifikasi aset'}</h2><div class="desc">Diisi oleh Tim Verifikator/Pengurus Barang saat opname fisik</div></div></div>
       <div class="panel-body">
         ${err ? `<div class="alert alert-bad">${err}</div>` : ''}
         ${ok ? `<div class="alert alert-good">${ok}</div>` : ''}
         ${state.data.assets.length===0 ? `<div class="alert alert-warn">Belum ada aset. Tambahkan aset melalui menu <b>Pencatatan Aset</b> terlebih dahulu.</div>` : `
         <form onsubmit="return handleVerifikasiSubmit(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label for="vf-asset">Kode/No. Register Aset</label>
+              <select id="vf-asset" ${editing?'disabled':''}>${assetOptions(editing?editing.assetId:undefined)}</select>
+            </div>
+            <div class="field">
+              <label for="vf-tanggal">Tanggal Verifikasi</label>
+              <input id="vf-tanggal" type="date" value="${editing?editing.tanggalVerifikasi:todayISO()}">
+            </div>
+          </div>
           <div class="field">
-            <label for="vf-asset">Aset</label>
-            <select id="vf-asset">${assetOptions()}</select>
+            <label for="vf-petugas">Petugas Verifikator</label>
+            <input id="vf-petugas" type="text" value="${editing?escapeHtml(editing.verifikator||''):''}" placeholder="Nama petugas verifikator">
           </div>
-          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;">Kelengkapan dokumen</label>
-          <div class="checklist-row"><input type="checkbox" id="vf-doc1"><label for="vf-doc1">Bukti kepemilikan / berita acara serah terima</label></div>
-          <div class="checklist-row"><input type="checkbox" id="vf-doc2"><label for="vf-doc2">Kartu inventaris barang (KIB)</label></div>
-          <div class="checklist-row"><input type="checkbox" id="vf-doc3"><label for="vf-doc3">Foto kondisi aset terkini</label></div>
-          <div class="field" style="margin-top:14px;">
-            <label for="vf-note">Catatan (opsional)</label>
-            <textarea id="vf-note" rows="2" placeholder="Catatan pemeriksaan..."></textarea>
+          <div class="grid-2">
+            <div class="field">
+              <label for="vf-kondisi">Kondisi Fisik Hasil Cek</label>
+              <select id="vf-kondisi">
+                <option value="Baik" ${!editing||editing.kondisiFisik==='Baik'?'selected':''}>Baik</option>
+                <option value="Rusak Ringan" ${editing&&editing.kondisiFisik==='Rusak Ringan'?'selected':''}>Rusak Ringan</option>
+                <option value="Rusak Berat" ${editing&&editing.kondisiFisik==='Rusak Berat'?'selected':''}>Rusak Berat</option>
+                <option value="Hilang" ${editing&&editing.kondisiFisik==='Hilang'?'selected':''}>Hilang</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="vf-kesesuaian">Kesesuaian Data</label>
+              <select id="vf-kesesuaian" onchange="handleVerifikasiKesesuaianChange(this.value)">
+                <option value="Sesuai" ${!editing||editing.kesesuaianData==='Sesuai'?'selected':''}>Sesuai</option>
+                <option value="Tidak Sesuai" ${editing&&editing.kesesuaianData==='Tidak Sesuai'?'selected':''}>Tidak Sesuai dengan catatan sistem</option>
+              </select>
+            </div>
           </div>
-          <div class="form-actions"><button type="submit" class="btn btn-primary">Simpan verifikasi</button></div>
+          <div class="field">
+            <label for="vf-selisih">Keterangan Ketidaksesuaian (jika ada selisih)</label>
+            <textarea id="vf-selisih" rows="2" placeholder="mis. kondisi sistem tercatat Baik, ditemukan Rusak Ringan">${editing?escapeHtml(editing.keteranganKetidaksesuaian||''):''}</textarea>
+          </div>
+          <div class="field">
+            <label for="vf-rekomendasi">Rekomendasi Tindak Lanjut</label>
+            <input id="vf-rekomendasi" type="text" value="${editing?escapeHtml(editing.rekomendasi||''):''}" placeholder="mis. usul perbaikan, mutasi, penghapusan (kosongkan jika tidak ada)">
+          </div>
+          <div class="field">
+            <label>Upload Bukti Foto Kondisi Terkini</label><br>
+            <button type="button" class="btn btn-ghost" onclick="alert('Fitur unggah foto akan tersedia pada pembaruan berikutnya.')">Unggah Foto</button>
+            <div class="hint-text">Tombol tersedia sebagai penanda tempat — penyimpanan foto akan diaktifkan pada tahap pengembangan berikutnya.</div>
+          </div>
+          <div class="form-actions" style="margin-top:14px;">
+            <button type="submit" class="btn btn-primary">${editing?'Simpan perubahan':'Simpan verifikasi'}</button>
+            ${editing ? `<button type="button" class="btn btn-ghost" onclick="handleCancelEditVerifikasi()">Batal edit</button>` : ''}
+          </div>
         </form>`}
       </div>
     </div>
     ${renderVerifikasiTable()}
+    ${renderRekapKetidaksesuaian()}
   `;
 }
+function handleVerifikasiKesesuaianChange(){ /* no-op, placeholder untuk kemungkinan validasi lanjutan */ }
 function renderVerifikasiTable(){
-  const rows = [...state.data.verifikasi].sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+  const statusFilter = state.verifikasiFilterStatus;
+  const tahunFilter = state.verifikasiFilterTahun;
+  const tahunOptions = [...new Set(state.data.verifikasi.map(r=>(r.tanggalVerifikasi||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  let rows = [...state.data.verifikasi].sort((a,b)=>(b.tanggalVerifikasi||'').localeCompare(a.tanggalVerifikasi||''));
+  if(statusFilter!=='ALL') rows = rows.filter(r=>r.status===statusFilter);
+  if(tahunFilter!=='ALL') rows = rows.filter(r=>(r.tanggalVerifikasi||'').slice(0,4)===tahunFilter);
   return `
     <div class="panel">
-      <div class="panel-head"><div><h2>Riwayat verifikasi</h2><div class="desc">${rows.length} catatan</div></div></div>
+      <div class="panel-head">
+        <div><h2>Output Tabel Hasil Verifikasi</h2><div class="desc">${rows.length} dari ${state.data.verifikasi.length} catatan</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select onchange="handleVerifikasiFilterStatus(this.value)" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius);font-size:13px;">
+            <option value="ALL" ${statusFilter==='ALL'?'selected':''}>Semua Status</option>
+            <option value="Terverifikasi" ${statusFilter==='Terverifikasi'?'selected':''}>Terverifikasi</option>
+            <option value="Perlu Tindak Lanjut" ${statusFilter==='Perlu Tindak Lanjut'?'selected':''}>Perlu Tindak Lanjut</option>
+          </select>
+          <select onchange="handleVerifikasiFilterTahun(this.value)" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius);font-size:13px;">
+            <option value="ALL" ${tahunFilter==='ALL'?'selected':''}>Semua Tahun</option>
+            ${tahunOptions.map(t=>`<option value="${t}" ${tahunFilter===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div class="panel-body" style="padding:0;">
         <table>
-          <thead><tr><th>Tanggal</th><th>Aset</th><th>Dokumen lengkap</th><th>Hasil</th><th>Catatan</th></tr></thead>
+          <thead><tr><th>No</th><th>Kode Aset</th><th>Nama Aset</th><th>Tgl Verifikasi</th><th>Verifikator</th><th>Kondisi Fisik</th><th>Kesesuaian Data</th><th>Rekomendasi</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            ${rows.length ? rows.map(r=>`
+            ${rows.length ? rows.map((r,i)=>{ const a=getAsset(r.assetId); return `
               <tr>
-                <td>${fmtDate(r.tanggal)}</td>
+                <td>${i+1}</td>
+                <td class="mono">${a?escapeHtml(a.kode):'—'}</td>
                 <td>${assetLabel(r.assetId)}</td>
-                <td>${r.checklist.kepemilikan?'✔':'—'} ${r.checklist.kartuInventaris?'✔':'—'} ${r.checklist.fotoKondisi?'✔':'—'}</td>
-                <td>${r.valid? statusBadge('Terverifikasi') : statusBadge('Belum Diverifikasi')}</td>
-                <td>${escapeHtml(r.catatan||'—')}</td>
-              </tr>`).join('') : '<tr class="empty-row"><td colspan="5">Belum ada riwayat verifikasi.</td></tr>'}
+                <td>${fmtDate(r.tanggalVerifikasi)}</td>
+                <td>${escapeHtml(r.verifikator||'—')}</td>
+                <td>${statusBadge(r.kondisiFisik)}</td>
+                <td>${r.kesesuaianData==='Sesuai'?statusBadge('Terverifikasi'):statusBadge('Perlu Tindak Lanjut')}</td>
+                <td>${escapeHtml(r.rekomendasi||'—')}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-ghost btn-sm" onclick="handlePrintBAVerifikasi('${r.id}')">Cetak Berita Acara</button>
+                  <button class="btn btn-ghost btn-sm" onclick="handleEditVerifikasi('${r.id}')">Edit</button>
+                  ${r.kesesuaianData==='Sesuai' ? `<button class="btn btn-ghost btn-sm" onclick="handleTandaiTidakSesuai('${r.id}')">Tandai Tidak Sesuai</button>` : ''}
+                </td>
+              </tr>`; }).join('') : '<tr class="empty-row"><td colspan="10">Belum ada riwayat verifikasi.</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>
   `;
 }
+function renderRekapKetidaksesuaian(){
+  const rows = state.data.verifikasi.filter(r=>r.kesesuaianData==='Tidak Sesuai');
+  return `
+    <div class="panel">
+      <div class="panel-head"><div><h2>Output Rekap Ketidaksesuaian (Selisih Data)</h2><div class="desc">Aset yang hasil verifikasinya tidak sesuai dengan data sistem</div></div></div>
+      <div class="panel-body" style="padding:0;">
+        <table>
+          <thead><tr><th>Kode Aset</th><th>Nama Aset</th><th>Data Sistem</th><th>Hasil Verifikasi</th><th>Selisih/Masalah</th><th>Tindak Lanjut</th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>{ const a=getAsset(r.assetId); return `
+              <tr>
+                <td class="mono">${a?escapeHtml(a.kode):'—'}</td>
+                <td>${assetLabel(r.assetId)}</td>
+                <td>${statusBadge(r.kondisiMenurutSistem||'—')}</td>
+                <td>${statusBadge(r.kondisiFisik)}</td>
+                <td>${escapeHtml(r.keteranganKetidaksesuaian||'—')}</td>
+                <td>${escapeHtml(r.rekomendasi||'—')}</td>
+              </tr>`; }).join('') : '<tr class="empty-row"><td colspan="6">Tidak ada selisih data. Semua hasil verifikasi sesuai dengan catatan sistem.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function handleVerifikasiFilterStatus(val){ state.verifikasiFilterStatus = val; renderApp(); }
+function handleVerifikasiFilterTahun(val){ state.verifikasiFilterTahun = val; renderApp(); }
+function handleEditVerifikasi(id){
+  state.editingVerifikasiId = id;
+  renderApp();
+  const panel = document.getElementById('form-verifikasi-panel');
+  if(panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function handleCancelEditVerifikasi(){
+  state.editingVerifikasiId = null;
+  renderApp();
+}
+async function handleTandaiTidakSesuai(id){
+  const r = state.data.verifikasi.find(x=>x.id===id);
+  if(!r) return;
+  r.kesesuaianData = 'Tidak Sesuai';
+  r.status = 'Perlu Tindak Lanjut';
+  await saveCollection('verifikasi');
+  renderApp();
+}
 async function handleVerifikasiSubmit(ev){
   ev.preventDefault();
+  const editingId = state.editingVerifikasiId;
   const assetId = document.getElementById('vf-asset').value;
-  const kepemilikan = document.getElementById('vf-doc1').checked;
-  const kartuInventaris = document.getElementById('vf-doc2').checked;
-  const fotoKondisi = document.getElementById('vf-doc3').checked;
-  const catatan = document.getElementById('vf-note').value.trim();
-  const valid = kepemilikan && kartuInventaris && fotoKondisi;
+  const tanggalVerifikasi = document.getElementById('vf-tanggal').value || todayISO();
+  const verifikator = document.getElementById('vf-petugas').value.trim();
+  const kondisiFisik = document.getElementById('vf-kondisi').value;
+  const kesesuaianData = document.getElementById('vf-kesesuaian').value;
+  const keteranganKetidaksesuaian = document.getElementById('vf-selisih').value.trim();
+  const rekomendasi = document.getElementById('vf-rekomendasi').value.trim();
+  const asset = getAsset(assetId);
 
-  const record = { id: uid('VER'), assetId, checklist:{kepemilikan,kartuInventaris,fotoKondisi}, valid, catatan, tanggal: todayISO() };
-  state.data.verifikasi.push(record);
+  if(!verifikator){
+    state.formError.verifikasi = 'Nama petugas verifikator wajib diisi.';
+    renderApp(); return false;
+  }
+  const status = kesesuaianData==='Sesuai' ? 'Terverifikasi' : 'Perlu Tindak Lanjut';
 
-  if(valid){
-    const asset = getAsset(assetId);
-    if(asset) asset.statusVerifikasi = 'Terverifikasi';
+  if(editingId){
+    const existing = state.data.verifikasi.find(r=>r.id===editingId);
+    if(existing){
+      Object.assign(existing, { tanggalVerifikasi, verifikator, kondisiFisik, kesesuaianData, keteranganKetidaksesuaian, rekomendasi, status });
+    }
+    if(asset){
+      asset.kondisi = kondisiFisik;
+      asset.statusVerifikasi = status==='Terverifikasi' ? 'Terverifikasi' : 'Belum Diverifikasi';
+    }
+    state.editingVerifikasiId = null;
     state.formError.verifikasi = null;
-    state.formSuccess.verifikasi = 'Data valid. Verifikasi tersimpan dan status aset diperbarui menjadi Terverifikasi.';
+    state.formSuccess.verifikasi = 'Perubahan hasil verifikasi berhasil disimpan.';
   } else {
-    const missing = [];
-    if(!kepemilikan) missing.push('bukti kepemilikan');
-    if(!kartuInventaris) missing.push('kartu inventaris');
-    if(!fotoKondisi) missing.push('foto kondisi');
-    state.formSuccess.verifikasi = null;
-    state.formError.verifikasi = `Data tidak lengkap. Dokumen berikut belum tersedia: ${missing.join(', ')}. Verifikasi dicatat sebagai belum valid.`;
+    const kondisiMenurutSistem = asset ? asset.kondisi : null;
+    const record = {
+      id: uid('VER'), assetId, tanggalVerifikasi, verifikator, kondisiFisik, kondisiMenurutSistem,
+      kesesuaianData, keteranganKetidaksesuaian, rekomendasi, status,
+      nomorBA: 'BA-VRF/' + Date.now().toString().slice(-6) + '/DTKT', tanggal: todayISO()
+    };
+    state.data.verifikasi.push(record);
+    if(asset){
+      asset.kondisi = kondisiFisik;
+      asset.statusVerifikasi = status==='Terverifikasi' ? 'Terverifikasi' : 'Belum Diverifikasi';
+    }
+    state.formError.verifikasi = null;
+    state.formSuccess.verifikasi = status==='Terverifikasi'
+      ? 'Data sesuai. Verifikasi tersimpan dan status aset diperbarui menjadi Terverifikasi.'
+      : 'Data tidak sesuai dengan catatan sistem. Verifikasi dicatat sebagai Perlu Tindak Lanjut.';
   }
   await saveCollection('verifikasi');
   await saveCollection('assets');
   renderApp();
   return false;
+}
+function handlePrintBAVerifikasi(recordId){
+  const r = state.data.verifikasi.find(x=>x.id===recordId);
+  if(!r) return;
+  const a = getAsset(r.assetId);
+  if(!a) return;
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  if(!win){ alert('Popup diblokir oleh browser. Izinkan popup untuk mencetak Berita Acara.'); return; }
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+  <title>BA Verifikasi - ${r.nomorBA}</title>
+  <style>
+    @page{ size: A4; margin: 2.2cm; }
+    body{ font-family: 'Times New Roman', serif; color:#111; font-size:13pt; line-height:1.5; }
+    .doc-header{ text-align:center; margin-bottom:6px; }
+    .doc-header img{ height:64px; margin-bottom:8px; }
+    .doc-header h1,.doc-header h2{ margin:2px 0; font-size:13pt; }
+    .doc-header h3{ font-size:14pt; text-decoration:underline; margin-top:10px; }
+    hr{ border:none; border-top:2px solid #111; margin:10px 0 22px; }
+    p{ text-align:justify; }
+    table.fields{ width:100%; border-collapse:collapse; margin-top:10px; }
+    table.fields td{ padding:5px 0; vertical-align:top; }
+    table.fields td.label{ width:220px; }
+    table.fields td.colon{ width:16px; }
+    .sign{ margin-top:50px; width:100%; }
+    .sign td{ width:50%; text-align:center; vertical-align:top; }
+    .sign .space{ height:70px; }
+    @media print{ .no-print{ display:none; } }
+  </style>
+  </head><body>
+    <div class="doc-header">
+      <img src="${SUMEDANG_LOGO_DATA_URL}" alt="Logo Kabupaten Sumedang">
+      <h1>PEMERINTAH KABUPATEN SUMEDANG</h1>
+      <h2>DINAS TENAGA KERJA DAN TRANSMIGRASI</h2>
+      <h3>BERITA ACARA HASIL VERIFIKASI/OPNAME FISIK BARANG MILIK DAERAH</h3>
+      <div>Nomor: ${escapeHtml(r.nomorBA)}</div>
+    </div>
+    <hr>
+    <p>Pada hari ini .................., tanggal .................., telah dilaksanakan verifikasi/opname fisik terhadap barang milik daerah dengan rincian sebagai berikut:</p>
+    <table class="fields">
+      <tr><td class="label">Kode Barang</td><td class="colon">:</td><td>${escapeHtml(a.kode||'-')}</td></tr>
+      <tr><td class="label">Nama Barang</td><td class="colon">:</td><td>${escapeHtml(a.nama||'-')}</td></tr>
+      <tr><td class="label">Kondisi Menurut Sistem</td><td class="colon">:</td><td>${escapeHtml(r.kondisiMenurutSistem||'-')}</td></tr>
+      <tr><td class="label">Kondisi Hasil Cek Fisik</td><td class="colon">:</td><td>${escapeHtml(r.kondisiFisik||'-')}</td></tr>
+      <tr><td class="label">Kesesuaian Data</td><td class="colon">:</td><td>${escapeHtml(r.kesesuaianData||'-')}</td></tr>
+      <tr><td class="label">Keterangan</td><td class="colon">:</td><td>${escapeHtml(r.keteranganKetidaksesuaian||'-')}</td></tr>
+      <tr><td class="label">Rekomendasi</td><td class="colon">:</td><td>${escapeHtml(r.rekomendasi||'-')}</td></tr>
+    </table>
+    <table class="sign">
+      <tr><td>Tim Verifikator,</td><td>Mengetahui,</td></tr>
+      <tr><td class="space"></td><td class="space"></td></tr>
+      <tr><td>(${escapeHtml(r.verifikator||'Petugas Verifikasi')})</td><td>(Kepala Bidang Umum)</td></tr>
+    </table>
+    <div class="no-print" style="margin-top:40px;text-align:center;">
+      <button onclick="window.print()" style="padding:8px 16px;">Cetak</button>
+    </div>
+  </body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.onload = function(){ win.focus(); win.print(); };
 }
 
 /* ================= RENDER: PEMINJAMAN ================= */
