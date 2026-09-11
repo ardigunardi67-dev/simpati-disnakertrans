@@ -78,18 +78,29 @@
     text-align:center;
     padding-top:12px;
   }
+  .login-simpati-marquee{
+    width:100%;
+    overflow:hidden;
+    margin:18px 0 10px;
+  }
   .login-simpati-word{
     font-family:'Playfair Display', serif;
     font-weight:900;
     font-size:56px;
     line-height:1.05;
     letter-spacing:2px;
-    margin:18px 0 10px;
+    margin:0;
     background:linear-gradient(120deg, var(--gold) 0%, #FBEFCF 35%, #FFFFFF 50%, #FBEFCF 65%, var(--gold) 100%);
     -webkit-background-clip:text;
     background-clip:text;
     color:transparent;
+    white-space:nowrap;
     display:inline-block;
+    animation:simpatiMarquee 9s linear infinite;
+  }
+  @keyframes simpatiMarquee{
+    0%{ transform:translateX(120%); }
+    100%{ transform:translateX(-120%); }
   }
   .login-simpati-expansion{
     font-family:'Inter',sans-serif;
@@ -100,6 +111,7 @@
     max-width:460px;
     margin:0 auto;
     line-height:1.55;
+    text-align:center;
   }
   .login-visual-logos{
     display:flex;
@@ -596,7 +608,9 @@
           <img src="" alt="Logo BerAKHLAK" id="visual-logo-berakhlak">
           <img src="" alt="Logo Widya Bhakti Karya Utama" id="visual-logo-widya">
         </div>
-        <div class="login-simpati-word">SIMPATI</div>
+        <div class="login-simpati-marquee">
+          <span class="login-simpati-word">SIMPATI</span>
+        </div>
         <p class="login-simpati-expansion">Sistem Informasi Manajemen Pengelolaan Aset Terintegrasi dan Identifikasi</p>
       </div>
       <div class="login-visual-tag">SISTEM INFORMASI ASET DAERAH</div>
